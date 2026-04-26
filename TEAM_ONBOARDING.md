@@ -10,15 +10,13 @@ This guide gives you three ways to access the platform: **(1) cloud URL** — ea
 
 ## ⭐ Option 1 — Use the Cloud URL (recommended for everyone)
 
-Once deployed, the platform will be live at:
+> ⚠️ **Cloud deployment is not yet live.** The team will deploy to Render between **April 27 – May 1, 2026**. Faysal will post the actual public URL in the team WhatsApp group once it goes live. Until then, please use **Option 2 (local install)** below.
 
-> **https://ai-security-platform.onrender.com** *(URL will be confirmed after deployment — Faysal will share in WhatsApp group)*
-
+Once deployed:
 - Open in any browser (Chrome, Edge, Safari).
 - **No installation needed.** No accounts. No keys.
 - Works on phone, tablet, laptop.
-
-If the page is slow on first load, wait 30 seconds — Render's free tier sleeps inactive servers and takes a moment to wake up.
+- If the page is slow on first load, wait 30 seconds — Render's free tier sleeps inactive servers and takes a moment to wake up.
 
 ---
 
