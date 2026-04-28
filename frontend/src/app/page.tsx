@@ -21,6 +21,16 @@ const FREE_MODELS = [
 
 const TECHNIQUES = ["poetry", "narrative", "metaphor", "euphemism", "role_shift"];
 
+/** Random sample of N items from an array (no repeats). */
+function randomSample<T>(arr: T[], n: number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, Math.min(n, a.length));
+}
+
 const PROGRESS_STAGES = [
   "Generating stylistic variants",
   "Sending prompts to target model",
@@ -38,10 +48,21 @@ export default function DashboardHome() {
   const [scenarioId, setScenarioId] = useState<number | null>(null);
   const [techniques, setTechniques] = useState<string[]>(["poetry"]);
   const [modelIdx, setModelIdx] = useState(0);
+  const [promptCount, setPromptCount] = useState(2);
   const [running, setRunning] = useState(false);
   const [progressStage, setProgressStage] = useState(0);
   const [result, setResult] = useState<TestRunDetails | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+
+  // BYOM (Bring Your Own Model) state
+  const [byomEnabled, setByomEnabled] = useState(false);
+  const [byomUrl, setByomUrl] = useState("");
+  const [byomKey, setByomKey] = useState("");
+  const [byomModel, setByomModel] = useState("");
+  const [byomVendor, setByomVendor] = useState("");
+
+  // How-to-use panel
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     api.health().then(setHealth).catch((e: Error) => setError(e.message));
@@ -80,16 +101,35 @@ export default function DashboardHome() {
     setResult(null);
 
     try {
-      const model = FREE_MODELS[modelIdx];
+      // Build the target model: either BYOM (custom endpoint) or one of the preset free models
+      let targetModel: Record<string, unknown>;
+      if (byomEnabled) {
+        if (!byomUrl || !byomModel) {
+          throw new Error("BYOM requires endpoint URL and model name");
+        }
+        targetModel = {
+          adapter: "custom",
+          model: byomModel,
+          vendor: byomVendor || "custom",
+          type: "enterprise",
+          base_url: byomUrl,
+          api_key: byomKey,
+        };
+      } else {
+        const m = FREE_MODELS[modelIdx];
+        targetModel = { adapter: m.adapter, model: m.model, vendor: m.vendor, type: "enterprise" };
+      }
+
+      // Randomize prompt selection — every run picks different prompts from the library
+      const sampled = randomSample(scenario.default_prompts, promptCount);
+
       const created = await api.runTest({
         test_name: `Live demo: ${scenario.name} - ${new Date().toISOString()}`,
         description: "Triggered from dashboard",
         attack_scenario_id: scenarioId,
-        baseline_prompts: scenario.default_prompts.slice(0, 2),
+        baseline_prompts: sampled,
         techniques,
-        target_models: [
-          { adapter: model.adapter, model: model.model, vendor: model.vendor, type: "enterprise" },
-        ],
+        target_models: [targetModel as never],
         variants_per_technique: 1,
       });
       const details = await api.getTest(created.test_id);
@@ -107,14 +147,68 @@ export default function DashboardHome() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-10">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
-            Enterprise AI Security Red Teaming Platform
-          </h1>
-          <p className="mt-2 text-slate-400">
-            Stress-test AI models for security vulnerabilities and compliance risks.
-          </p>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+              Enterprise AI Security Red Teaming Platform
+            </h1>
+            <p className="mt-2 text-slate-400">
+              Stress-test AI models for security vulnerabilities and compliance risks.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowGuide((v) => !v)}
+            className="text-xs px-3 py-1.5 rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition shrink-0"
+          >
+            {showGuide ? "✕ Close guide" : "?  How to use"}
+          </button>
         </header>
+
+        {/* Collapsible How-to-use panel */}
+        {showGuide && (
+          <section className="mb-8 rounded-xl bg-slate-900 border border-cyan-500/30 p-6">
+            <h2 className="text-lg font-semibold mb-3 text-cyan-300">How to use this platform</h2>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-slate-300">
+              <li>
+                <strong>Pick an attack scenario.</strong> Each scenario tests a specific
+                vendor promise (e.g., &quot;your data is isolated&quot;) using a curated
+                library of baseline prompts.
+              </li>
+              <li>
+                <strong>Choose stylistic techniques.</strong> Each baseline prompt gets
+                rewritten as poetry, narrative, metaphor, etc. — to bypass simple keyword
+                filters and probe for deeper vulnerabilities.
+              </li>
+              <li>
+                <strong>Pick a target AI model.</strong> Choose from preset free-tier
+                models (Gemini, Groq Llama, OpenRouter) or enable{" "}
+                <em className="text-cyan-300">Bring Your Own Model</em> to test your
+                organization&apos;s own AI deployment via its OpenAI-compatible endpoint.
+              </li>
+              <li>
+                <strong>Set prompt count.</strong> The slider controls how many random
+                prompts are sampled from the scenario library — higher = more thorough,
+                slower. Each run picks different prompts.
+              </li>
+              <li>
+                <strong>Run the test.</strong> Watch the live progress as the platform
+                generates variants, sends them to the model, scores responses on a 0–10
+                CVSS scale, and maps findings to compliance frameworks (SOC 2, ISO 27001,
+                GDPR, NIST AI RMF, CCPA, CPCSC).
+              </li>
+              <li>
+                <strong>Review results.</strong> See per-variant breakdown — original
+                prompt, rewritten variant, model response, leakage detection, risk score.
+                Download the JSON report or print it as PDF.
+              </li>
+            </ol>
+            <p className="mt-4 text-xs text-slate-500">
+              <strong>Privacy note:</strong> BYOM credentials are sent to the backend
+              over HTTPS for the duration of the test only. Keys are not stored, logged,
+              or persisted. For production use, deploy a private instance.
+            </p>
+          </section>
+        )}
 
         {/* Backend status */}
         <section className="mb-8 rounded-xl bg-slate-900 border border-slate-800 p-6">
@@ -184,27 +278,107 @@ export default function DashboardHome() {
                 </div>
               </div>
 
-              {/* Model */}
+              {/* Number of prompts to sample */}
               <div>
                 <label className="block text-xs uppercase tracking-wide text-slate-500 mb-2">
-                  Target model
+                  Number of prompts to sample (random each run): {promptCount}
                 </label>
-                <select
-                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
-                  value={modelIdx}
-                  onChange={(e) => setModelIdx(Number(e.target.value))}
+                <input
+                  type="range"
+                  min={1}
+                  max={5}
+                  value={promptCount}
+                  onChange={(e) => setPromptCount(Number(e.target.value))}
                   disabled={running}
-                >
-                  {FREE_MODELS.map((m, i) => (
-                    <option key={i} value={i}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-xs text-slate-500">
-                  Tip: if a model says &quot;quota exceeded,&quot; switch to another vendor.
-                  Free tiers refresh daily (Gemini) or per-minute (Groq).
+                  className="w-full accent-cyan-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Each run picks different random prompts from the scenario&apos;s library
+                  ({scenarios.find((s) => s.id === scenarioId)?.default_prompts.length ?? 0}{" "}
+                  available).
                 </p>
+              </div>
+
+              {/* Model picker — preset or BYOM */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs uppercase tracking-wide text-slate-500">
+                    Target model
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={byomEnabled}
+                      onChange={(e) => setByomEnabled(e.target.checked)}
+                      disabled={running}
+                      className="accent-cyan-500"
+                    />
+                    Bring Your Own Model (BYOM)
+                  </label>
+                </div>
+
+                {!byomEnabled ? (
+                  <>
+                    <select
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                      value={modelIdx}
+                      onChange={(e) => setModelIdx(Number(e.target.value))}
+                      disabled={running}
+                    >
+                      {FREE_MODELS.map((m, i) => (
+                        <option key={i} value={i}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Tip: if a model says &quot;quota exceeded,&quot; switch to another
+                      vendor. Free tiers refresh daily (Gemini) or per-minute (Groq).
+                    </p>
+                  </>
+                ) : (
+                  <div className="space-y-2 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
+                    <input
+                      type="url"
+                      placeholder="https://your-ai.example.com/v1  (OpenAI-compatible endpoint)"
+                      value={byomUrl}
+                      onChange={(e) => setByomUrl(e.target.value)}
+                      disabled={running}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm font-mono"
+                    />
+                    <input
+                      type="password"
+                      placeholder="API key (sent over HTTPS, never stored)"
+                      value={byomKey}
+                      onChange={(e) => setByomKey(e.target.value)}
+                      disabled={running}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm font-mono"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Model name (e.g. gpt-4o-mini)"
+                        value={byomModel}
+                        onChange={(e) => setByomModel(e.target.value)}
+                        disabled={running}
+                        className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Vendor label (e.g. Acme Corp)"
+                        value={byomVendor}
+                        onChange={(e) => setByomVendor(e.target.value)}
+                        disabled={running}
+                        className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <p className="text-xs text-cyan-300/70">
+                      🔒 Your endpoint must be OpenAI-compatible
+                      (<code>/v1/chat/completions</code> format). Keys are forwarded to your
+                      endpoint for this run only — never logged or persisted.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Run button */}

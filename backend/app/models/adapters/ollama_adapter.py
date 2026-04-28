@@ -141,6 +141,23 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
             base_url="https://api-inference.huggingface.co/v1",
             vendor="huggingface",
         )
+    elif adapter_type == "custom":
+        # Bring Your Own Model — credentials and endpoint provided per-request
+        # by the client. Used for testing the customer's own AI deployments.
+        from .openai_adapter import OpenAIAdapter
+        custom_url = model_config.get("base_url")
+        custom_key = model_config.get("api_key", "")
+        custom_model = model_config.get("model", "gpt-4")
+        custom_vendor = model_config.get("vendor", "custom")
+        print(f"[ADAPTER FACTORY] -> Creating Custom (BYOM) Adapter for {custom_url}")
+        if not custom_url:
+            raise ValueError("BYOM adapter requires base_url in model_config")
+        return OpenAIAdapter(
+            api_key=custom_key or "no-key",
+            model=custom_model,
+            base_url=custom_url,
+            vendor=custom_vendor,
+        )
     elif adapter_type == "ollama":
         from app.core.config import settings
         print("[ADAPTER FACTORY] -> Creating Ollama Adapter")
