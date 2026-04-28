@@ -76,41 +76,24 @@ services:
         value: ""  # No Ollama in cloud — leave empty
 
   # ---------- RQ async worker ----------
-  - type: worker
-    name: ai-security-worker
-    runtime: docker
-    plan: free
-    region: oregon
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerCommand: python start_worker.py
-    autoDeploy: true
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ai-security-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: ai-security-redis
-          property: connectionString
-      - key: GOOGLE_API_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: HF_TOKEN
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: GOOGLE_MODEL
-        value: gemini-2.5-flash
+  # NOTE: Background Workers are NOT included in Render's free plan ($7/mo each).
+  # The platform's POST /api/v1/security-tests/run endpoint runs synchronously
+  # inline, so the worker is not strictly required for capstone demos.
+  # Keep this section commented; uncomment if/when upgrading to a paid plan.
+  #
+  # - type: worker
+  #   name: ai-security-worker
+  #   runtime: docker
+  #   plan: starter        # Background workers require paid plan
+  #   region: oregon
+  #   rootDir: backend
+  #   dockerfilePath: ./Dockerfile
+  #   dockerCommand: python start_worker.py
+  #   envVars:
+  #     - key: DATABASE_URL
+  #       fromDatabase: { name: ai-security-db, property: connectionString }
+  #     - key: REDIS_URL
+  #       fromService: { type: redis, name: ai-security-redis, property: connectionString }
 
   # ---------- Next.js frontend ----------
   - type: web
