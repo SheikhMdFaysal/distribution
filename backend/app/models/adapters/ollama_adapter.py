@@ -111,6 +111,36 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
             api_key=settings.GOOGLE_API_KEY or "demo-key",
             model=model_config.get("model", "gemini-1.5-pro")
         )
+    elif adapter_type == "groq":
+        from .openai_adapter import OpenAIAdapter
+        from app.core.config import settings
+        print("[ADAPTER FACTORY] -> Creating Groq Adapter (OpenAI-compatible)")
+        return OpenAIAdapter(
+            api_key=settings.GROQ_API_KEY or "demo-key",
+            model=model_config.get("model", "llama-3.1-8b-instant"),
+            base_url="https://api.groq.com/openai/v1",
+            vendor="groq",
+        )
+    elif adapter_type == "openrouter":
+        from .openai_adapter import OpenAIAdapter
+        from app.core.config import settings
+        print("[ADAPTER FACTORY] -> Creating OpenRouter Adapter (OpenAI-compatible)")
+        return OpenAIAdapter(
+            api_key=settings.OPENROUTER_API_KEY or "demo-key",
+            model=model_config.get("model", "inclusionai/ling-2.6-flash:free"),
+            base_url="https://openrouter.ai/api/v1",
+            vendor="openrouter",
+        )
+    elif adapter_type == "huggingface":
+        from .openai_adapter import OpenAIAdapter
+        from app.core.config import settings
+        print("[ADAPTER FACTORY] -> Creating Hugging Face Adapter (OpenAI-compatible)")
+        return OpenAIAdapter(
+            api_key=settings.HF_TOKEN or "demo-key",
+            model=model_config.get("model", "meta-llama/Llama-3.1-8B-Instruct"),
+            base_url="https://api-inference.huggingface.co/v1",
+            vendor="huggingface",
+        )
     elif adapter_type == "ollama":
         from app.core.config import settings
         print("[ADAPTER FACTORY] -> Creating Ollama Adapter")

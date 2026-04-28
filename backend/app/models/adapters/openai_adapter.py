@@ -3,17 +3,30 @@ from .base import ModelAdapter
 
 
 class OpenAIAdapter(ModelAdapter):
-    """Adapter for OpenAI GPT models"""
-    
-    def __init__(self, api_key: str, model: str = "gpt-4", timeout: int = 30, max_retries: int = 3):
+    """Adapter for any OpenAI-compatible chat completions API (OpenAI, Groq, OpenRouter, Together, etc.)"""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4",
+        timeout: int = 30,
+        max_retries: int = 3,
+        base_url: Optional[str] = None,
+        vendor: str = "openai",
+    ):
         super().__init__(timeout, max_retries)
         self.api_key = api_key
         self.model = model
+        self.vendor = vendor
+        self.base_url = base_url
         self.model_type = "enterprise" if "enterprise" in model else "public"
-        
+
         try:
             import openai
-            self.client_openai = openai.OpenAI(api_key=api_key)
+            kwargs = {"api_key": api_key}
+            if base_url:
+                kwargs["base_url"] = base_url
+            self.client_openai = openai.OpenAI(**kwargs)
         except ImportError:
             self.client_openai = None
     
@@ -39,7 +52,7 @@ class OpenAIAdapter(ModelAdapter):
                     "response_text": response.choices[0].message.content,
                     "model_name": self.model,
                     "model_type": self.model_type,
-                    "vendor": "openai",
+                    "vendor": self.vendor,
                     "metadata": {
                         "tokens_used": response.usage.total_tokens if response.usage else 0,
                         "response_time_ms": 0,  # Will be set by base class
@@ -52,7 +65,7 @@ class OpenAIAdapter(ModelAdapter):
                     "response_text": f"[Simulated OpenAI response for: {prompt[:50]}...]",
                     "model_name": self.model,
                     "model_type": self.model_type,
-                    "vendor": "openai",
+                    "vendor": self.vendor,
                     "metadata": {
                         "tokens_used": len(prompt.split()),
                         "response_time_ms": 0,
