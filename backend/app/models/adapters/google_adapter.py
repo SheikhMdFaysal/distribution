@@ -1,5 +1,22 @@
 from typing import Dict, Any, Optional
+import builtins as _builtins
 from .base import ModelAdapter
+
+
+def _safe_print(*args, **kwargs):
+    """ASCII-safe print — strips Unicode chars that crash on Windows cp1252 console."""
+    safe_args = []
+    for a in args:
+        try:
+            s = str(a)
+            safe_args.append(s.encode("ascii", errors="replace").decode("ascii"))
+        except Exception:
+            safe_args.append("<unprintable>")
+    _builtins.print(*safe_args, **kwargs)
+
+
+# Override print within this module
+print = _safe_print
 
 
 class GoogleAdapter(ModelAdapter):
@@ -21,18 +38,18 @@ class GoogleAdapter(ModelAdapter):
                     import google.genai as genai
                     self.client = genai
                     self.client.configure(api_key=api_key)
-                    print("[GOOGLE ADAPTER] ✓ Using NEW google.genai package")
+                    print("[GOOGLE ADAPTER] [OK] Using NEW google.genai package")
                 except ImportError:
                     # Fall back to deprecated package
                     import google.generativeai as genai
                     genai.configure(api_key=api_key)
                     self.client = genai
-                    print("[GOOGLE ADAPTER] ✓ Using deprecated google.generativeai (consider upgrading)")
+                    print("[GOOGLE ADAPTER] [OK] Using deprecated google.generativeai (consider upgrading)")
             except Exception as e:
-                print(f"[GOOGLE ADAPTER] ✗ Error: {e}")
+                print(f"[GOOGLE ADAPTER] [X] Error: {e}")
                 self.client = None
         else:
-            print("[GOOGLE ADAPTER] ✗ No valid API key - using SIMULATION")
+            print("[GOOGLE ADAPTER] [X] No valid API key - using SIMULATION")
     
     def generate(self, prompt: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate response using Google Gemini API"""
@@ -48,7 +65,7 @@ class GoogleAdapter(ModelAdapter):
         
         try:
             if self.client:
-                print("[GOOGLE ADAPTER] → Calling REAL Google Gemini API...")
+                print("[GOOGLE ADAPTER] -> Calling REAL Google Gemini API...")
                 
                 # Try new API first
                 try:
@@ -77,7 +94,9 @@ class GoogleAdapter(ModelAdapter):
                     elif hasattr(response, 'parts'):
                         response_text = "".join([part.text for part in response.parts if hasattr(part, 'text')])
                 
-                print(f"[GOOGLE ADAPTER] ✓ Got response: {response_text[:100]}...")
+                # ASCII-safe print: Gemini responses can contain Unicode that breaks Windows cp1252 console
+                _safe = response_text[:100].encode("ascii", errors="replace").decode("ascii")
+                print(f"[GOOGLE ADAPTER] [OK] Got response: {_safe}...")
                 
                 return {
                     "response_text": response_text,
@@ -91,7 +110,7 @@ class GoogleAdapter(ModelAdapter):
                     }
                 }
             else:
-                print("[GOOGLE ADAPTER] → Using SIMULATED response (no API)")
+                print("[GOOGLE ADAPTER] -> Using SIMULATED response (no API)")
                 return {
                     "response_text": f"[Simulated Google Gemini response for: {prompt[:50]}...]",
                     "model_name": self.model,
@@ -104,7 +123,7 @@ class GoogleAdapter(ModelAdapter):
                     }
                 }
         except Exception as e:
-            print(f"[GOOGLE ADAPTER] ✗ Error: {str(e)}")
+            print(f"[GOOGLE ADAPTER] [X] Error: {str(e)}")
             return {
                 "response_text": f"[Error: {str(e)}]",
                 "model_name": self.model,

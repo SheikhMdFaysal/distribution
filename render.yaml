@@ -1,0 +1,129 @@
+# Render Blueprint — Enterprise AI Security Red Teaming Platform
+# Defines all four services + Postgres + Redis.
+# Deploy via: https://render.com/deploy → connect SheikhMdFaysal/distribution → confirm.
+#
+# IMPORTANT: After deployment, set these secrets in the Render dashboard
+# (Environment tab on each service that needs them):
+#   GOOGLE_API_KEY        - https://aistudio.google.com/apikey
+#   OPENROUTER_API_KEY    - https://openrouter.ai/keys
+#   GROQ_API_KEY          - https://console.groq.com/keys
+#   HF_TOKEN              - https://huggingface.co/settings/tokens
+#   ANTHROPIC_API_KEY     - https://console.anthropic.com (when you get it)
+#   OPENAI_API_KEY        - https://platform.openai.com (when you get it)
+
+databases:
+  - name: ai-security-db
+    databaseName: ai_security
+    plan: free
+    region: oregon
+
+services:
+  # ---------- Redis (job queue) ----------
+  - type: redis
+    name: ai-security-redis
+    plan: free
+    region: oregon
+    ipAllowList: []  # Internal-only access from web/worker services
+    maxmemoryPolicy: noeviction
+
+  # ---------- FastAPI backend ----------
+  - type: web
+    name: ai-security-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-security-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-security-redis
+          property: connectionString
+      - key: ALLOWED_ORIGINS
+        sync: false  # Set this to the frontend URL after first deploy
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_MODEL
+        value: gemini-2.5-flash
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ANTHROPIC_MODEL
+        value: claude-3-5-haiku-20241022
+      - key: OLLAMA_BASE_URL
+        value: ""  # No Ollama in cloud — leave empty
+
+  # ---------- RQ async worker ----------
+  - type: worker
+    name: ai-security-worker
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python start_worker.py
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-security-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-security-redis
+          property: connectionString
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_MODEL
+        value: gemini-2.5-flash
+
+  # ---------- Next.js frontend ----------
+  - type: web
+    name: ai-security-frontend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: frontend
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: ai-security-backend
+          property: host  # injects "ai-security-backend.onrender.com"

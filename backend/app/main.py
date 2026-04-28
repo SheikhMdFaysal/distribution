@@ -1,3 +1,11 @@
+import sys
+# Force UTF-8 stdout/stderr so prints with Unicode (e.g. Gemini responses) don't crash on Windows cp1252.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse

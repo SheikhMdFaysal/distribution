@@ -90,7 +90,7 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
     if adapter_type == "openai":
         from .openai_adapter import OpenAIAdapter
         from app.core.config import settings
-        print("[ADAPTER FACTORY] → Creating OpenAI Adapter")
+        print("[ADAPTER FACTORY] -> Creating OpenAI Adapter")
         return OpenAIAdapter(
             api_key=settings.OPENAI_API_KEY or "demo-key",
             model=model_config.get("model", "gpt-4")
@@ -98,7 +98,7 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
     elif adapter_type == "anthropic":
         from .anthropic_adapter import AnthropicAdapter
         from app.core.config import settings
-        print("[ADAPTER FACTORY] → Creating Anthropic Adapter")
+        print("[ADAPTER FACTORY] -> Creating Anthropic Adapter")
         return AnthropicAdapter(
             api_key=settings.ANTHROPIC_API_KEY or "demo-key",
             model=model_config.get("model", "claude-3-opus-20240229")
@@ -106,14 +106,14 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
     elif adapter_type == "google":
         from .google_adapter import GoogleAdapter
         from app.core.config import settings
-        print("[ADAPTER FACTORY] → Creating Google Adapter")
+        print("[ADAPTER FACTORY] -> Creating Google Adapter")
         return GoogleAdapter(
             api_key=settings.GOOGLE_API_KEY or "demo-key",
             model=model_config.get("model", "gemini-1.5-pro")
         )
     elif adapter_type == "ollama":
         from app.core.config import settings
-        print("[ADAPTER FACTORY] → Creating Ollama Adapter")
+        print("[ADAPTER FACTORY] -> Creating Ollama Adapter")
         return OllamaAdapter(
             base_url=settings.OLLAMA_BASE_URL,
             model=model_config.get("model", "llama3")
@@ -122,7 +122,7 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
         # Default to OpenAI
         from .openai_adapter import OpenAIAdapter
         from app.core.config import settings
-        print(f"[ADAPTER FACTORY] → Unknown adapter '{adapter_type}', defaulting to OpenAI")
+        print(f"[ADAPTER FACTORY] -> Unknown adapter '{adapter_type}', defaulting to OpenAI")
         return OpenAIAdapter(
             api_key=settings.OPENAI_API_KEY or "demo-key",
             model="gpt-4"
