@@ -16,8 +16,19 @@ from app.core.config import settings
 from app.models.database import init_db, get_session_local
 from app.api.routes import security_tests, variants, analytics, health
 
-# Initialize database on startup
+# Initialize database on startup + seed attack scenarios on first boot
 init_db()
+try:
+    from app.seed_data import seed_attack_scenarios
+    _SessionLocal = get_session_local()
+    _seed_db = _SessionLocal()
+    try:
+        seed_attack_scenarios(_seed_db)
+        print("[STARTUP] Attack scenarios seeded (idempotent — skips if already present)")
+    finally:
+        _seed_db.close()
+except Exception as _seed_err:
+    print(f"[STARTUP] Seed step failed (non-fatal): {_seed_err}")
 
 app = FastAPI(
     title=settings.APP_NAME,
