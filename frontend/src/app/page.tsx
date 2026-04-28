@@ -7,6 +7,7 @@ import {
   type HealthResponse,
   type TestRunDetails,
 } from "@/lib/api";
+import { getRemediation } from "@/lib/remediation";
 
 // All free-tier models supported by the backend.
 // (Backend's adapter factory routes "google", "groq", "openrouter", "huggingface".)
@@ -400,7 +401,9 @@ export default function DashboardHome() {
         </section>
 
         {/* Result */}
-        {result && <ResultPanel result={result} apiBase={apiBase} />}
+        {result && (
+          <ResultPanel result={result} apiBase={apiBase} scenarios={scenarios} />
+        )}
       </div>
     </main>
   );
@@ -465,7 +468,15 @@ function isQuotaError(text: string) {
   );
 }
 
-function ResultPanel({ result, apiBase }: { result: TestRunDetails; apiBase: string }) {
+function ResultPanel({
+  result,
+  apiBase,
+  scenarios,
+}: {
+  result: TestRunDetails;
+  apiBase: string;
+  scenarios: AttackScenario[];
+}) {
   const riskColor =
     result.risk_level === "HIGH"
       ? "text-red-400"
@@ -474,6 +485,15 @@ function ResultPanel({ result, apiBase }: { result: TestRunDetails; apiBase: str
       : "text-green-400";
 
   const exportJsonUrl = `${apiBase}/api/v1/security-tests/${result.id}/export`;
+
+  // Look up the scenario slug ("enterprise_data_isolation") for remediation guidance
+  const matchedScenario = scenarios.find((s) => s.id === result.attack_scenario.id);
+  const scenarioKey = matchedScenario?.scenario_id ?? "default";
+
+  // Did any model run report leakage?
+  const hasVulnerability = result.baseline_prompts.some((bp) =>
+    bp.variants.some((v) => v.model_runs.some((r) => r.evaluation?.leakage_detected))
+  );
 
   return (
     <section className="rounded-xl bg-slate-900 border border-slate-800 p-6">
@@ -511,6 +531,10 @@ function ResultPanel({ result, apiBase }: { result: TestRunDetails; apiBase: str
         />
         <Metric label="Risk level" value={result.risk_level ?? "—"} color={riskColor} />
       </div>
+
+      {hasVulnerability && (
+        <RemediationPanel scenarioKey={scenarioKey} />
+      )}
 
       <div className="space-y-3">
         {result.baseline_prompts.map((bp) =>
@@ -593,6 +617,88 @@ function Metric({
     <div className="rounded-lg bg-slate-800/50 p-3">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`mt-1 text-lg font-bold ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function RemediationPanel({ scenarioKey }: { scenarioKey: string }) {
+  const r = getRemediation(scenarioKey);
+  return (
+    <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5 mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-amber-400 text-xl">⚠</span>
+        <h3 className="text-base font-semibold text-amber-200">
+          Recommended Remediation
+        </h3>
+      </div>
+
+      <div className="space-y-4 text-sm">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+            What happened
+          </div>
+          <p className="text-slate-300">{r.whatHappened}</p>
+        </div>
+
+        <div>
+          <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+            Why it matters
+          </div>
+          <p className="text-slate-300">{r.whyItMatters}</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+              Immediate actions
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-300 text-sm">
+              {r.immediateActions.map((a, i) => (
+                <li key={i}>{a}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+              Long-term fixes
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-300 text-sm">
+              {r.longTermFixes.map((a, i) => (
+                <li key={i}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+              Compliance impact
+            </div>
+            <ul className="space-y-1 text-slate-300 text-xs">
+              {r.complianceImpact.map((c, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-red-400 mt-0.5">●</span>
+                  <span>{c}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-amber-300/80 mb-1">
+              Who to notify
+            </div>
+            <ul className="space-y-1 text-slate-300 text-xs">
+              {r.whoToNotify.map((w, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-cyan-400 mt-0.5">●</span>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
