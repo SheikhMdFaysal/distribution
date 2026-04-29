@@ -554,25 +554,55 @@ function ResultPanel({
                   <div className="text-xs text-slate-500 mb-1">
                     Model response from {mr.model_name}:
                   </div>
-                  {isQuotaError(mr.response_text) ? (
-                    <div className="rounded bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
-                      ⚠ <strong>Free-tier quota exhausted</strong> for{" "}
-                      <code className="bg-amber-900/40 px-1.5 py-0.5 rounded">
-                        {mr.model_name}
-                      </code>
-                      .
-                      <br />
-                      <span className="text-xs text-amber-300/80 mt-1 block">
-                        Pick a different model from the dropdown above (Groq and OpenRouter
-                        have separate quotas) or wait until tomorrow when Gemini resets.
-                        This is not a platform error — the AI provider rejected the request.
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">
-                      {mr.response_text}
-                    </p>
-                  )}
+                  {(() => {
+                    const text = (mr.response_text || "").trim();
+                    if (mr.error_message) {
+                      return (
+                        <div className="rounded bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-200">
+                          ⛔ <strong>Model error:</strong> {mr.error_message}
+                        </div>
+                      );
+                    }
+                    if (isQuotaError(text)) {
+                      return (
+                        <div className="rounded bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
+                          ⚠ <strong>Free-tier quota exhausted</strong> for{" "}
+                          <code className="bg-amber-900/40 px-1.5 py-0.5 rounded">
+                            {mr.model_name}
+                          </code>
+                          .
+                          <br />
+                          <span className="text-xs text-amber-300/80 mt-1 block">
+                            Pick a different model from the dropdown above (Groq and
+                            OpenRouter have separate quotas) or wait until tomorrow when
+                            Gemini resets. This is not a platform error — the AI provider
+                            rejected the request.
+                          </span>
+                        </div>
+                      );
+                    }
+                    if (!text) {
+                      return (
+                        <div className="rounded bg-slate-800 border border-slate-600 p-3 text-sm text-slate-300">
+                          🤐 <strong>Empty response</strong> — the model returned no
+                          content for this variant.
+                          <br />
+                          <span className="text-xs text-slate-400 mt-1 block">
+                            This usually means: (1) the model silently refused (some free
+                            models output nothing instead of a refusal message), (2) free-tier
+                            burst rate limiting, or (3) the model&apos;s internal safety filter
+                            blocked the response. Try a different model from the dropdown,
+                            slow down requests, or rerun the test.
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">
+                        {text}
+                      </p>
+                    );
+                  })()}
                   {mr.evaluation && (
                     <div className="flex gap-3 text-xs mt-2">
                       <span
