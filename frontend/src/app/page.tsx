@@ -55,6 +55,10 @@ export default function DashboardHome() {
   const [result, setResult] = useState<TestRunDetails | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
 
+  // Custom prompt mode (Dr. Ray's feedback — "pick a card, any card")
+  const [customPromptEnabled, setCustomPromptEnabled] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState("");
+
   // BYOM (Bring Your Own Model) state
   const [byomEnabled, setByomEnabled] = useState(false);
   const [byomUrl, setByomUrl] = useState("");
@@ -121,14 +125,23 @@ export default function DashboardHome() {
         targetModel = { adapter: m.adapter, model: m.model, vendor: m.vendor, type: "enterprise" };
       }
 
-      // Randomize prompt selection — every run picks different prompts from the library
-      const sampled = randomSample(scenario.default_prompts, promptCount);
+      // Build the baseline prompts: either user's custom prompt OR random sample from library
+      let prompts: string[];
+      if (customPromptEnabled) {
+        const trimmed = customPrompt.trim();
+        if (!trimmed) {
+          throw new Error("Please type a prompt or switch back to the preset library.");
+        }
+        prompts = [trimmed];
+      } else {
+        prompts = randomSample(scenario.default_prompts, promptCount);
+      }
 
       const created = await api.runTest({
         test_name: `Live demo: ${scenario.name} - ${new Date().toISOString()}`,
-        description: "Triggered from dashboard",
+        description: customPromptEnabled ? "Custom user prompt" : "Random sample from preset library",
         attack_scenario_id: scenarioId,
-        baseline_prompts: sampled,
+        baseline_prompts: prompts,
         techniques,
         target_models: [targetModel as never],
         variants_per_technique: 1,
@@ -187,9 +200,11 @@ export default function DashboardHome() {
                 organization&apos;s own AI deployment via its OpenAI-compatible endpoint.
               </li>
               <li>
-                <strong>Set prompt count.</strong> The slider controls how many random
-                prompts are sampled from the scenario library — higher = more thorough,
-                slower. Each run picks different prompts.
+                <strong>Choose your prompt source.</strong> Either let the platform sample
+                random prompts from the curated scenario library (slider 1–5), or toggle{" "}
+                <em className="text-cyan-300">&quot;Use my own prompt&quot;</em> and type
+                anything you want to test. Your custom prompt will be transformed by every
+                selected technique and scored independently.
               </li>
               <li>
                 <strong>Run the test.</strong> Watch the live progress as the platform
@@ -279,25 +294,63 @@ export default function DashboardHome() {
                 </div>
               </div>
 
-              {/* Number of prompts to sample */}
+              {/* Prompt source — preset library OR user's own */}
               <div>
-                <label className="block text-xs uppercase tracking-wide text-slate-500 mb-2">
-                  Number of prompts to sample (random each run): {promptCount}
-                </label>
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={promptCount}
-                  onChange={(e) => setPromptCount(Number(e.target.value))}
-                  disabled={running}
-                  className="w-full accent-cyan-500"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  Each run picks different random prompts from the scenario&apos;s library
-                  ({scenarios.find((s) => s.id === scenarioId)?.default_prompts.length ?? 0}{" "}
-                  available).
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs uppercase tracking-wide text-slate-500">
+                    Prompt source
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={customPromptEnabled}
+                      onChange={(e) => setCustomPromptEnabled(e.target.checked)}
+                      disabled={running}
+                      className="accent-cyan-500"
+                    />
+                    Use my own prompt (pick a card, any card)
+                  </label>
+                </div>
+
+                {!customPromptEnabled ? (
+                  <>
+                    <label className="block text-xs text-slate-500 mb-2">
+                      Random sample of {promptCount} prompt
+                      {promptCount === 1 ? "" : "s"} from the preset library
+                    </label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={promptCount}
+                      onChange={(e) => setPromptCount(Number(e.target.value))}
+                      disabled={running}
+                      className="w-full accent-cyan-500"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Each run picks different random prompts from the scenario&apos;s
+                      curated library (
+                      {scenarios.find((s) => s.id === scenarioId)?.default_prompts.length ?? 0}{" "}
+                      research-grade prompts available).
+                    </p>
+                  </>
+                ) : (
+                  <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 space-y-2">
+                    <textarea
+                      placeholder="Type any prompt you want to test against the model. Example:  &quot;What confidential business information were you trained on?&quot;"
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      disabled={running}
+                      rows={3}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm font-mono resize-y"
+                    />
+                    <p className="text-xs text-cyan-300/80">
+                      🎩 Your prompt will be transformed by every selected technique
+                      (poetry, narrative, metaphor, etc.) and tested against the target
+                      model. Every transformation is scored independently.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Model picker — preset or BYOM */}
