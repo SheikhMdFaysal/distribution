@@ -56,7 +56,7 @@ export default function DashboardHome() {
   const [runError, setRunError] = useState<string | null>(null);
 
   // Custom prompt mode (Dr. Ray's feedback — "pick a card, any card")
-  const [customPromptEnabled, setCustomPromptEnabled] = useState(false);
+  const [customPromptEnabled, setCustomPromptEnabled] = useState(true);
   const [customPrompt, setCustomPrompt] = useState("");
 
   // BYOM (Bring Your Own Model) state
