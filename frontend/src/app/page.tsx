@@ -20,7 +20,18 @@ const FREE_MODELS = [
   { adapter: "openrouter", model: "tencent/hy3-preview:free", vendor: "OpenRouter", label: "Tencent HY3 Preview — free (OpenRouter)" },
 ];
 
-const TECHNIQUES = ["poetry", "narrative", "metaphor", "euphemism", "role_shift"];
+const TECHNIQUES = [
+  "poetry",
+  "narrative",
+  "metaphor",
+  "euphemism",
+  "role_shift",
+  "hypothetical",
+  "academic",
+  "technical_jargon",
+  "reverse_psychology",
+  "direct",
+];
 
 /** Random sample of N items from an array (no repeats). */
 function randomSample<T>(arr: T[], n: number): T[] {
