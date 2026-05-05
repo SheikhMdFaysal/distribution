@@ -98,6 +98,21 @@ export interface RunTestResponse {
   vulnerabilities_found: number;
 }
 
+export interface VendorComparisonRow {
+  vendor: string;
+  model: string;
+  runs: number;
+  leakage_incidents: number;
+  leakage_rate: number;
+  avg_risk_score: number;
+  highest_risk_score: number;
+  promise_compliance_rate: number;
+}
+
+export interface VendorComparisonResponse {
+  vendors: VendorComparisonRow[];
+}
+
 // ---------- Fetch helper ----------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -127,4 +142,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getTest: (id: number) => request<TestRunDetails>(`/api/v1/security-tests/${id}`),
+  vendorComparison: () =>
+    request<VendorComparisonResponse>("/api/v1/analytics/vendor-comparison"),
 };

@@ -6,6 +6,7 @@ import {
   type AttackScenario,
   type HealthResponse,
   type TestRunDetails,
+  type VendorComparisonRow,
 } from "@/lib/api";
 import { getRemediation } from "@/lib/remediation";
 
@@ -548,7 +549,8 @@ function ResultPanel({
       ? "text-amber-400"
       : "text-green-400";
 
-  const exportJsonUrl = `${apiBase}/api/v1/security-tests/${result.id}/export`;
+  const exportUrl = (fmt: "pdf" | "csv" | "json") =>
+    `${apiBase}/api/v1/security-tests/${result.id}/export?format=${fmt}`;
 
   // Look up the scenario slug ("enterprise_data_isolation") for remediation guidance
   const matchedScenario = scenarios.find((s) => s.id === result.attack_scenario.id);
@@ -565,12 +567,28 @@ function ResultPanel({
         <h2 className="text-lg font-semibold">Test Result</h2>
         <div className="flex gap-2">
           <a
-            href={exportJsonUrl}
+            href={exportUrl("pdf")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-3 py-1.5 rounded border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition"
+          >
+            ⬇ PDF
+          </a>
+          <a
+            href={exportUrl("csv")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-3 py-1.5 rounded border border-green-500/40 bg-green-500/10 text-green-300 hover:bg-green-500/20 transition"
+          >
+            ⬇ CSV
+          </a>
+          <a
+            href={exportUrl("json")}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs px-3 py-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition"
           >
-            ⬇ Download report (JSON)
+            ⬇ JSON
           </a>
           <button
             onClick={() => window.print()}
@@ -599,6 +617,8 @@ function ResultPanel({
       {hasVulnerability && (
         <RemediationPanel scenarioKey={scenarioKey} />
       )}
+
+      <VendorComparisonPanel />
 
       <div className="space-y-3">
         {result.baseline_prompts.map((bp) =>
@@ -711,6 +731,94 @@ function Metric({
     <div className="rounded-lg bg-slate-800/50 p-3">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`mt-1 text-lg font-bold ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function VendorComparisonPanel() {
+  const [rows, setRows] = useState<VendorComparisonRow[] | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .vendorComparison()
+      .then((r) => setRows(r.vendors))
+      .catch((e: Error) => setLoadErr(e.message));
+  }, []);
+
+  if (loadErr) return null;
+  if (!rows || rows.length === 0) return null;
+
+  const sorted = [...rows].sort((a, b) => b.avg_risk_score - a.avg_risk_score);
+
+  return (
+    <div className="rounded-xl border border-purple-500/40 bg-purple-500/5 p-5 mb-6">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-purple-300">📊</span>
+        <h3 className="text-base font-semibold text-purple-200">
+          Cross-Model Comparison
+        </h3>
+      </div>
+      <p className="text-xs text-slate-400 mb-4 italic">
+        Aggregate stats across every test you have run on this platform. Higher
+        leakage rate or higher avg risk score means the model is more vulnerable
+        to the prompts you have tested.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-700">
+              <th className="text-left py-2 px-2">Vendor</th>
+              <th className="text-left py-2 px-2">Model</th>
+              <th className="text-right py-2 px-2">Runs</th>
+              <th className="text-right py-2 px-2">Leakage Rate</th>
+              <th className="text-right py-2 px-2">Avg Risk</th>
+              <th className="text-right py-2 px-2">Max Risk</th>
+              <th className="text-right py-2 px-2">Promise Held</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r, i) => {
+              const leakColor =
+                r.leakage_rate >= 50
+                  ? "text-red-400"
+                  : r.leakage_rate >= 20
+                  ? "text-amber-400"
+                  : "text-green-400";
+              const riskColor =
+                r.avg_risk_score >= 7
+                  ? "text-red-400"
+                  : r.avg_risk_score >= 4
+                  ? "text-amber-400"
+                  : "text-green-400";
+              return (
+                <tr
+                  key={`${r.vendor}-${r.model}-${i}`}
+                  className="border-b border-slate-800/50 hover:bg-slate-800/30"
+                >
+                  <td className="py-2 px-2 text-slate-300">{r.vendor}</td>
+                  <td className="py-2 px-2 text-slate-400 font-mono text-xs">
+                    {r.model}
+                  </td>
+                  <td className="py-2 px-2 text-right text-slate-400">{r.runs}</td>
+                  <td className={`py-2 px-2 text-right font-semibold ${leakColor}`}>
+                    {r.leakage_rate.toFixed(1)}%
+                  </td>
+                  <td className={`py-2 px-2 text-right font-semibold ${riskColor}`}>
+                    {r.avg_risk_score.toFixed(2)}
+                  </td>
+                  <td className="py-2 px-2 text-right text-slate-300">
+                    {r.highest_risk_score.toFixed(2)}
+                  </td>
+                  <td className="py-2 px-2 text-right text-cyan-300">
+                    {r.promise_compliance_rate.toFixed(1)}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
