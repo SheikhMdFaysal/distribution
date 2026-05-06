@@ -141,6 +141,18 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
             base_url="https://api-inference.huggingface.co/v1",
             vendor="huggingface",
         )
+    elif adapter_type == "nvidia":
+        # NVIDIA NIM via the OpenAI-compatible endpoint at integrate.api.nvidia.com.
+        # Free tier credits available with an NVIDIA Developer account.
+        from .openai_adapter import OpenAIAdapter
+        from app.core.config import settings
+        print("[ADAPTER FACTORY] -> Creating NVIDIA NIM Adapter (OpenAI-compatible)")
+        return OpenAIAdapter(
+            api_key=settings.NVIDIA_API_KEY or "demo-key",
+            model=model_config.get("model", "meta/llama-3.1-8b-instruct"),
+            base_url="https://integrate.api.nvidia.com/v1",
+            vendor="nvidia",
+        )
     elif adapter_type == "custom":
         # Bring Your Own Model — credentials and endpoint provided per-request
         # by the client. Used for testing the customer's own AI deployments.

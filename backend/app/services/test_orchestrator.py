@@ -189,7 +189,7 @@ class TestOrchestrator:
             leakage_detected=detection_result["leakage_detected"],
             leakage_categories=detection_result["categories"],
             confidence_scores=detection_result["confidence"],
-            evidence=str(detection_result["evidence"]),
+            evidence=__import__("json").dumps(detection_result["evidence"]),
             risk_score=risk_result["risk_score"],
             risk_level=risk_result["risk_level"],
             data_classification=data_classification,

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
+    NVIDIA_API_KEY: Optional[str] = None
     TOGETHER_API_KEY: Optional[str] = None
     
     # Model Configuration

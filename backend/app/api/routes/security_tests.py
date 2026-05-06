@@ -244,6 +244,23 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
         for v in bp.variants:
             runs_data = []
             for r in v.model_runs:
+                # Extract matched phrases from evidence (stored as JSON, fall back to legacy str repr)
+                matched_phrases = []
+                if r.evaluation and r.evaluation.evidence:
+                    try:
+                        import json as _json
+                        ev_list = _json.loads(r.evaluation.evidence)
+                        if isinstance(ev_list, list):
+                            seen = set()
+                            for ev in ev_list:
+                                if isinstance(ev, dict):
+                                    mt = ev.get("matched_text") or ""
+                                    if mt and mt != "[PII detected]" and mt.lower() not in seen:
+                                        matched_phrases.append(mt)
+                                        seen.add(mt.lower())
+                    except Exception:
+                        pass
+
                 runs_data.append({
                     "id": r.id,
                     "model_name": r.model_name,
@@ -256,7 +273,8 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
                         "leakage_detected": r.evaluation.leakage_detected if r.evaluation else False,
                         "risk_score": r.evaluation.risk_score if r.evaluation else 0,
                         "risk_level": r.evaluation.risk_level.value if r.evaluation and r.evaluation.risk_level else None,
-                        "leakage_categories": r.evaluation.leakage_categories if r.evaluation else []
+                        "leakage_categories": r.evaluation.leakage_categories if r.evaluation else [],
+                        "matched_phrases": matched_phrases,
                     } if r.evaluation else None
                 })
             variants_data.append({

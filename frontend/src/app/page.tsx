@@ -17,8 +17,12 @@ const FREE_MODELS = [
   { adapter: "google", model: "gemini-2.0-flash", vendor: "Google", label: "Gemini 2.0 Flash (Google)" },
   { adapter: "groq", model: "llama-3.1-8b-instant", vendor: "Groq", label: "Llama 3.1 8B Instant (Groq)" },
   { adapter: "groq", model: "llama-3.3-70b-versatile", vendor: "Groq", label: "Llama 3.3 70B (Groq)" },
-  { adapter: "openrouter", model: "inclusionai/ling-2.6-flash:free", vendor: "OpenRouter", label: "Ling 2.6 Flash — free (OpenRouter)" },
-  { adapter: "openrouter", model: "tencent/hy3-preview:free", vendor: "OpenRouter", label: "Tencent HY3 Preview — free (OpenRouter)" },
+  { adapter: "openrouter", model: "inclusionai/ling-2.6-flash:free", vendor: "OpenRouter", label: "Ling 2.6 Flash free (OpenRouter)" },
+  { adapter: "openrouter", model: "tencent/hy3-preview:free", vendor: "OpenRouter", label: "Tencent HY3 Preview free (OpenRouter)" },
+  { adapter: "huggingface", model: "meta-llama/Llama-3.1-8B-Instruct", vendor: "HuggingFace", label: "Llama 3.1 8B Instruct (HuggingFace)" },
+  { adapter: "huggingface", model: "mistralai/Mistral-7B-Instruct-v0.3", vendor: "HuggingFace", label: "Mistral 7B Instruct (HuggingFace)" },
+  { adapter: "nvidia", model: "meta/llama-3.1-8b-instruct", vendor: "NVIDIA", label: "Llama 3.1 8B Instruct (NVIDIA NIM)" },
+  { adapter: "nvidia", model: "meta/llama-3.3-70b-instruct", vendor: "NVIDIA", label: "Llama 3.3 70B Instruct (NVIDIA NIM)" },
 ];
 
 const TECHNIQUES = [
@@ -522,6 +526,57 @@ function ProgressBar({ stageIdx }: { stageIdx: number }) {
   );
 }
 
+/**
+ * Render `text` with the given matched phrases highlighted.
+ * Used to show clients exactly which words/sentences triggered leakage flags.
+ */
+function HighlightedResponse({
+  text,
+  phrases,
+}: {
+  text: string;
+  phrases: string[];
+}) {
+  if (!phrases || phrases.length === 0) {
+    return (
+      <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">{text}</p>
+    );
+  }
+  // Build a regex that matches any of the phrases (case-insensitive, escaped)
+  const escaped = phrases
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (escaped.length === 0) {
+    return (
+      <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">{text}</p>
+    );
+  }
+  const re = new RegExp(`(${escaped.join("|")})`, "gi");
+  const parts = text.split(re);
+  return (
+    <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">
+      {parts.map((part, i) => {
+        const isMatch = re.test(part);
+        // reset lastIndex because of the global flag
+        re.lastIndex = 0;
+        if (isMatch) {
+          return (
+            <mark
+              key={i}
+              className="bg-red-500/30 text-red-100 px-1 rounded border-b-2 border-red-500"
+              title="Detected leakage phrase"
+            >
+              {part}
+            </mark>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </p>
+  );
+}
+
 function isQuotaError(text: string) {
   if (!text) return false;
   const t = text.toLowerCase();
@@ -682,13 +737,14 @@ function ResultPanel({
                       );
                     }
                     return (
-                      <p className="text-sm text-slate-300 mb-2 whitespace-pre-line">
-                        {text}
-                      </p>
+                      <HighlightedResponse
+                        text={text}
+                        phrases={mr.evaluation?.matched_phrases ?? []}
+                      />
                     );
                   })()}
                   {mr.evaluation && (
-                    <div className="flex gap-3 text-xs mt-2">
+                    <div className="flex flex-wrap gap-3 text-xs mt-2 items-center">
                       <span
                         className={
                           mr.evaluation.leakage_detected
@@ -701,6 +757,12 @@ function ResultPanel({
                       <span className="text-slate-400">
                         Risk: {mr.evaluation.risk_score.toFixed(1)} ({mr.evaluation.risk_level})
                       </span>
+                      {mr.evaluation.leakage_detected &&
+                        (mr.evaluation.matched_phrases?.length ?? 0) > 0 && (
+                          <span className="text-slate-500 italic">
+                            (highlighted text shows where leakage was detected)
+                          </span>
+                        )}
                     </div>
                   )}
                 </div>

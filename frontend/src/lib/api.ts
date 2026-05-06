@@ -45,6 +45,7 @@ export interface ModelRun {
     risk_score: number;
     risk_level: string;
     leakage_categories: string[];
+    matched_phrases?: string[];
   } | null;
 }
 
