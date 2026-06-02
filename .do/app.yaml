@@ -1,0 +1,89 @@
+# DigitalOcean App Platform specification
+# Detected automatically when you create an app from this GitHub repo.
+# Cost: ~$20/month total ($5 backend + $5 frontend + $15 dev database).
+# Free for the first 60 days under the $200 new-user credit.
+
+name: ai-security-platform
+region: nyc
+
+databases:
+  - name: ai-security-db
+    engine: PG
+    version: "16"
+    size: db-s-dev-database
+    num_nodes: 1
+    production: false
+
+services:
+  - name: backend
+    source_dir: backend
+    dockerfile_path: backend/Dockerfile
+    github:
+      repo: SheikhMdFaysal/distribution
+      branch: main
+      deploy_on_push: true
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8000
+    health_check:
+      http_path: /api/v1/health
+      initial_delay_seconds: 30
+      period_seconds: 20
+    envs:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${ai-security-db.DATABASE_URL}
+      - key: SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: ALLOWED_ORIGINS
+        scope: RUN_TIME
+        value: ${frontend.PUBLIC_URL}
+      - key: GOOGLE_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: OPENROUTER_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: GROQ_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: HF_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: NVIDIA_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: ANTHROPIC_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: GOOGLE_MODEL
+        value: gemini-2.5-flash
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ANTHROPIC_MODEL
+        value: claude-3-5-haiku-20241022
+      - key: OLLAMA_BASE_URL
+        value: ""
+
+  - name: frontend
+    source_dir: frontend
+    dockerfile_path: frontend/Dockerfile
+    github:
+      repo: SheikhMdFaysal/distribution
+      branch: main
+      deploy_on_push: true
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 3000
+    envs:
+      - key: NEXT_PUBLIC_API_URL
+        scope: BUILD_TIME
+        value: ${backend.PUBLIC_URL}
