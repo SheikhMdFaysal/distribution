@@ -100,6 +100,9 @@ function DashboardInner() {
   // How-to-use panel
   const [showGuide, setShowGuide] = useState(false);
 
+  // Bump this to force the StatsWidget and ActivityTicker to refresh
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+
   useEffect(() => {
     api.health().then(setHealth).catch((e: Error) => setError(e.message));
     api
@@ -180,6 +183,8 @@ function DashboardInner() {
       });
       const details = await api.getTest(created.test_id);
       setResult(details);
+      // Trigger an immediate refresh of the live stats widget
+      setStatsRefreshKey((k) => k + 1);
       const vulnCount = details.vulnerabilities_found ?? 0;
       toast.show(
         vulnCount > 0
@@ -277,7 +282,7 @@ function DashboardInner() {
         <ActivityTicker />
 
         {/* Live stats */}
-        <StatsWidget />
+        <StatsWidget refreshKey={statsRefreshKey} />
 
         {/* Run a test */}
         <section className="mb-8 rounded-xl bg-slate-900 border border-slate-800 p-6">

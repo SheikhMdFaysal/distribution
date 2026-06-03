@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type DashboardAnalytics } from "@/lib/api";
 
 interface StatsItem {
@@ -12,27 +12,48 @@ interface StatsItem {
   Icon: () => React.ReactNode;
 }
 
+interface StatsWidgetProps {
+  /** Bump this number from the parent to force an immediate refresh
+   *  (e.g., right after a test completes). */
+  refreshKey?: number;
+}
+
 /**
  * Stats widget with animated counters.
  * Pulls real numbers from /api/v1/analytics/dashboard.
- * Numbers count up smoothly when they come into view.
+ * Auto-refreshes every 15 seconds, and immediately when refreshKey changes.
  */
-export function StatsWidget() {
+export function StatsWidget({ refreshKey = 0 }: StatsWidgetProps) {
   const [data, setData] = useState<DashboardAnalytics | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
 
-  useEffect(() => {
+  const fetchStats = useCallback(() => {
     api
       .dashboardAnalytics()
       .then((d) => {
         setData(d);
         setLoaded(true);
+        setErrored(false);
       })
-      .catch(() => {
-        // Graceful degradation: show zeros instead of an error block
+      .catch((err) => {
+        // Surface to the browser console so it shows up in DevTools
+        console.error("[StatsWidget] dashboard fetch failed:", err);
         setLoaded(true);
+        setErrored(true);
       });
   }, []);
+
+  useEffect(() => {
+    // Initial fetch + on every refreshKey change (test completion)
+    fetchStats();
+  }, [fetchStats, refreshKey]);
+
+  useEffect(() => {
+    // Auto-refresh every 15 seconds while the page is open
+    const id = window.setInterval(fetchStats, 15_000);
+    return () => window.clearInterval(id);
+  }, [fetchStats]);
 
   const stats: StatsItem[] = [
     {
@@ -66,8 +87,14 @@ export function StatsWidget() {
   ];
 
   return (
-    <section className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
-      {stats.map((s) => (
+    <section className="mb-8">
+      {errored && (
+        <div className="mb-2 text-xs text-rose-400">
+          Could not load stats. Retrying every 15s. Check DevTools console for details.
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
+        {stats.map((s) => (
         <div
           key={s.label}
           className="rounded-xl border border-slate-800 bg-slate-900 p-4 hover:border-slate-700 transition"
@@ -83,7 +110,8 @@ export function StatsWidget() {
           </div>
           <div className="text-xs text-slate-500 mt-1">{s.label}</div>
         </div>
-      ))}
+        ))}
+      </div>
     </section>
   );
 }
