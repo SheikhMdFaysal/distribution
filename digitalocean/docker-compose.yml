@@ -1,0 +1,113 @@
+# Docker Compose for DigitalOcean Droplet deployment
+# Runs the entire platform on a single $6/mo droplet.
+#
+# Architecture:
+#   Caddy (port 80/443, HTTPS auto) -> Frontend (3000) + Backend (8000)
+#   PostgreSQL 16, Redis 7 internal-only.
+#
+# Deploy: see DIGITALOCEAN_MIGRATION.md
+#
+
+version: "3.9"
+
+services:
+  # ---------- Caddy: HTTPS reverse proxy ----------
+  caddy:
+    image: caddy:2-alpine
+    container_name: ai-security-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+  # ---------- PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-security-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_security}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_security}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_security}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:7-alpine
+    container_name: ai-security-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- FastAPI Backend ----------
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: ai-security-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ai_security}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_security}
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SECRET_KEY: ${SECRET_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      HF_TOKEN: ${HF_TOKEN}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_MODEL: gemini-2.5-flash
+      OPENAI_MODEL: gpt-4o-mini
+      ANTHROPIC_MODEL: claude-3-5-haiku-20241022
+      OLLAMA_BASE_URL: ""
+    expose:
+      - "8000"
+
+  # ---------- Next.js Frontend ----------
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    container_name: ai-security-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - "3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

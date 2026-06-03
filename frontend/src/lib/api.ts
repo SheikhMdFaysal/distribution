@@ -114,6 +114,37 @@ export interface VendorComparisonResponse {
   vendors: VendorComparisonRow[];
 }
 
+export interface ActivityEntry {
+  run_id: number;
+  test_id: number;
+  model: string;
+  vendor: string;
+  leakage_detected: boolean;
+  risk_score: number;
+  risk_level: string;
+  timestamp: string | null;
+}
+
+export interface RecentActivityResponse {
+  activity: ActivityEntry[];
+}
+
+export interface DashboardAnalytics {
+  summary: {
+    total_tests: number;
+    completed_tests: number;
+    total_vulnerabilities: number;
+    avg_risk_score: number;
+  };
+  vendor_comparison: Array<{
+    vendor: string;
+    total_runs: number;
+    leakage_incidents: number;
+    leakage_rate: number;
+  }>;
+  risk_distribution: Array<{ level: string; count: number }>;
+}
+
 // ---------- Fetch helper ----------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -145,4 +176,8 @@ export const api = {
   getTest: (id: number) => request<TestRunDetails>(`/api/v1/security-tests/${id}`),
   vendorComparison: () =>
     request<VendorComparisonResponse>("/api/v1/analytics/vendor-comparison"),
+  dashboardAnalytics: () =>
+    request<DashboardAnalytics>("/api/v1/analytics/dashboard"),
+  recentActivity: (limit = 15) =>
+    request<RecentActivityResponse>(`/api/v1/analytics/recent-activity?limit=${limit}`),
 };

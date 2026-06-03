@@ -9,6 +9,12 @@ import {
   type VendorComparisonRow,
 } from "@/lib/api";
 import { getRemediation } from "@/lib/remediation";
+import { StatusDot } from "@/components/StatusDot";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { StatsWidget } from "@/components/StatsWidget";
+import { ScenarioFormSkeleton } from "@/components/Skeleton";
+import { ToastProvider, useToast } from "@/components/Toast";
+import { ActivityTicker } from "@/components/ActivityTicker";
 
 // All free-tier models supported by the backend.
 // (Backend's adapter factory routes "google", "groq", "openrouter", "huggingface".)
@@ -57,6 +63,15 @@ const PROGRESS_STAGES = [
 ];
 
 export default function DashboardHome() {
+  return (
+    <ToastProvider>
+      <DashboardInner />
+    </ToastProvider>
+  );
+}
+
+function DashboardInner() {
+  const toast = useToast();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [scenarios, setScenarios] = useState<AttackScenario[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +135,7 @@ export default function DashboardHome() {
     setRunning(true);
     setRunError(null);
     setResult(null);
+    toast.show(`Running security test: ${scenario.name}`, "info");
 
     try {
       // Build the target model: either BYOM (custom endpoint) or one of the preset free models
@@ -164,8 +180,17 @@ export default function DashboardHome() {
       });
       const details = await api.getTest(created.test_id);
       setResult(details);
+      const vulnCount = details.vulnerabilities_found ?? 0;
+      toast.show(
+        vulnCount > 0
+          ? `Test complete · ${vulnCount} vulnerabilit${vulnCount === 1 ? "y" : "ies"} detected`
+          : "Test complete · no vulnerabilities detected",
+        vulnCount > 0 ? "error" : "success"
+      );
     } catch (e) {
-      setRunError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setRunError(msg);
+      toast.show(`Test failed: ${msg}`, "error", 6000);
     } finally {
       setRunning(false);
     }
@@ -186,12 +211,16 @@ export default function DashboardHome() {
               Stress-test AI models for security vulnerabilities and compliance risks.
             </p>
           </div>
-          <button
-            onClick={() => setShowGuide((v) => !v)}
-            className="text-xs px-3 py-1.5 rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition shrink-0"
-          >
-            {showGuide ? "✕ Close guide" : "?  How to use"}
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <StatusDot health={health} error={error} />
+            <ThemeToggle />
+            <button
+              onClick={() => setShowGuide((v) => !v)}
+              className="text-xs px-3 py-1.5 rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
+            >
+              {showGuide ? "✕ Close guide" : "?  How to use"}
+            </button>
+          </div>
         </header>
 
         {/* Collapsible How-to-use panel */}
@@ -242,24 +271,24 @@ export default function DashboardHome() {
           </section>
         )}
 
-        {/* Backend status */}
-        <section className="mb-8 rounded-xl bg-slate-900 border border-slate-800 p-6">
-          <h2 className="text-lg font-semibold mb-3">Backend Status</h2>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          {health && (
-            <div className="grid grid-cols-3 gap-4">
-              <Stat label="Status" value={health.status} color="green" />
-              <Stat label="Version" value={health.version} color="cyan" />
-              <Stat label="Environment" value={health.environment} color="purple" />
-            </div>
-          )}
-        </section>
+        {/* Backend status moved to header dot (see StatusDot component) */}
+
+        {/* Live activity ticker */}
+        <ActivityTicker />
+
+        {/* Live stats */}
+        <StatsWidget />
 
         {/* Run a test */}
         <section className="mb-8 rounded-xl bg-slate-900 border border-slate-800 p-6">
           <h2 className="text-lg font-semibold mb-4">Run a Security Test</h2>
 
-          {scenarios.length === 0 && <p className="text-slate-400">Loading scenarios...</p>}
+          {scenarios.length === 0 && !error && <ScenarioFormSkeleton />}
+          {scenarios.length === 0 && error && (
+            <p className="text-rose-400 text-sm">
+              Unable to load scenarios. The backend may still be starting. Retrying automatically…
+            </p>
+          )}
 
           {scenarios.length > 0 && (
             <div className="space-y-5">

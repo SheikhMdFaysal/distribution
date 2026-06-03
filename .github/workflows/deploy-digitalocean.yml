@@ -1,0 +1,115 @@
+# Auto-deploy to DigitalOcean Droplet on push to main.
+#
+# Behaves exactly like Render's autoDeploy: every push to the main branch
+# triggers a fresh deployment on the droplet within ~2 minutes.
+#
+# Requires three GitHub repository secrets (Settings -> Secrets and variables -> Actions):
+#   DROPLET_HOST       - IP address or hostname of your droplet
+#   DROPLET_USER       - SSH user (usually "root")
+#   DROPLET_SSH_KEY    - Private SSH key for the deploy user (the matching public
+#                        key must be in /root/.ssh/authorized_keys on the droplet)
+#
+# Optional secret:
+#   DROPLET_PORT       - SSH port (defaults to 22)
+
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+  workflow_dispatch:  # allows manual trigger from Actions tab
+
+concurrency:
+  group: deploy-digitalocean
+  cancel-in-progress: false  # never cancel an in-flight deployment
+
+jobs:
+  deploy:
+    name: Build and Deploy to Droplet
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+
+      - name: Add droplet to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.DROPLET_PORT || '22' }} -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Verify SSH connection
+        run: |
+          ssh -p ${{ secrets.DROPLET_PORT || '22' }} \
+              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+              "echo 'SSH connection successful'; uname -a"
+
+      - name: Deploy on droplet
+        run: |
+          ssh -p ${{ secrets.DROPLET_PORT || '22' }} \
+              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+              "bash -s" <<'EOF'
+          set -e
+
+          REPO_PATH="/root/Enterprise-AI-Security-Red-Teaming-Platform"
+          DEPLOY_PATH="$REPO_PATH/distribution/digitalocean"
+
+          echo "==> Pulling latest code..."
+          cd "$REPO_PATH"
+          git fetch origin main
+          git reset --hard origin/main
+
+          echo "==> Switching to deployment folder..."
+          cd "$DEPLOY_PATH"
+
+          echo "==> Building containers..."
+          docker compose build --pull
+
+          echo "==> Restarting services with zero-downtime..."
+          docker compose up -d --remove-orphans
+
+          echo "==> Cleaning up unused images..."
+          docker image prune -f
+
+          echo "==> Health check..."
+          sleep 10
+          docker compose ps
+
+          echo "==> Deployment complete."
+          EOF
+
+      - name: Verify backend health
+        run: |
+          sleep 10
+          BACKEND_URL="http://${{ secrets.DROPLET_HOST }}:8000/api/v1/health"
+          for i in {1..6}; do
+            if curl -fsS "$BACKEND_URL" > /dev/null 2>&1; then
+              echo "Backend healthy."
+              exit 0
+            fi
+            echo "Attempt $i/6: backend not ready, waiting 10s..."
+            sleep 10
+          done
+          echo "WARNING: Backend health check did not pass within 60s."
+          echo "Check droplet logs:  ssh root@${{ secrets.DROPLET_HOST }} 'cd /root/Enterprise-AI-Security-Red-Teaming-Platform/distribution/digitalocean && docker compose logs --tail=100 backend'"
+          # Do not fail the workflow on health check failure; service may still be starting.
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deployment failed. Check the logs above and SSH into the droplet to investigate."
+          echo "Quick troubleshooting:"
+          echo "  ssh root@${{ secrets.DROPLET_HOST }}"
+          echo "  cd /root/Enterprise-AI-Security-Red-Teaming-Platform/distribution/digitalocean"
+          echo "  docker compose ps"
+          echo "  docker compose logs --tail=100"

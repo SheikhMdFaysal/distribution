@@ -1,0 +1,36 @@
+# Caddyfile for HTTPS auto-provisioning on DigitalOcean Droplet
+#
+# Replace YOUR_DOMAIN.com with your actual domain.
+# If you do not have a domain yet, replace both blocks with a single
+# block matching :80 and remove the HTTPS bits (see DIGITALOCEAN_MIGRATION.md
+# section "Option B: No Domain").
+
+# ---------- Frontend (Next.js) on root domain ----------
+YOUR_DOMAIN.com {
+    reverse_proxy frontend:3000
+
+    # Compression
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+# ---------- Backend API on api subdomain ----------
+api.YOUR_DOMAIN.com {
+    reverse_proxy backend:8000
+
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Access-Control-Allow-Origin "https://YOUR_DOMAIN.com"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization"
+    }
+}

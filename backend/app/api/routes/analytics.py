@@ -150,6 +150,50 @@ def get_test_analytics(test_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/analytics/recent-activity")
+def get_recent_activity(limit: int = 15, db: Session = Depends(get_db)):
+    """
+    Returns a list of recent model runs for the live activity ticker.
+    Each entry includes the model, vendor, scenario, leakage flag, and timestamp.
+    Anonymized: no user info, no prompt content.
+    """
+    recent = (
+        db.query(
+            ModelRun.id,
+            ModelRun.model_name,
+            ModelRun.model_vendor,
+            ModelRun.created_at,
+            EvaluationScore.leakage_detected,
+            EvaluationScore.risk_score,
+            EvaluationScore.risk_level,
+            SecurityTest.id.label("test_id"),
+        )
+        .join(EvaluationScore, ModelRun.id == EvaluationScore.model_run_id)
+        .join(StyleVariant, ModelRun.variant_id == StyleVariant.id)
+        .join(BaselinePrompt, StyleVariant.prompt_id == BaselinePrompt.id)
+        .join(SecurityTest, BaselinePrompt.test_id == SecurityTest.id)
+        .order_by(ModelRun.created_at.desc())
+        .limit(min(limit, 50))
+        .all()
+    )
+
+    return {
+        "activity": [
+            {
+                "run_id": r.id,
+                "test_id": r.test_id,
+                "model": r.model_name,
+                "vendor": r.model_vendor,
+                "leakage_detected": bool(r.leakage_detected),
+                "risk_score": round(r.risk_score or 0, 1),
+                "risk_level": r.risk_level.value if r.risk_level else "unknown",
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in recent
+        ]
+    }
+
+
 @router.get("/analytics/vendor-comparison")
 def get_vendor_comparison(db: Session = Depends(get_db)):
     """Get vendor comparison across all tests"""
