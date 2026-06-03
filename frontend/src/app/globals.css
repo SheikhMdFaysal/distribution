@@ -26,6 +26,115 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ============================================================
+   LIGHT THEME OVERRIDES
+   The dashboard was built with hardcoded dark slate colors.
+   When the user picks "light" theme, html does NOT have .dark
+   class, so these rules flip the dark slates to light equivalents.
+   This avoids a 1000-line page.tsx refactor while making the
+   theme toggle actually work visually.
+   ============================================================ */
+
+html:not(.dark) {
+  /* Backgrounds: invert the slate scale */
+  --slate-50: #0a0a0a;
+  --slate-100: #0f172a;
+}
+
+html:not(.dark) body {
+  background-color: #ffffff;
+}
+
+/* Page-level background */
+html:not(.dark) .bg-slate-950 {
+  background-color: #ffffff !important;
+}
+html:not(.dark) .bg-slate-900,
+html:not(.dark) .bg-slate-900\/60,
+html:not(.dark) .bg-slate-900\/80 {
+  background-color: #f8fafc !important;
+}
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-slate-800\/80 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Text colors */
+html:not(.dark) .text-slate-100 {
+  color: #0f172a !important;
+}
+html:not(.dark) .text-slate-200 {
+  color: #1e293b !important;
+}
+html:not(.dark) .text-slate-300 {
+  color: #334155 !important;
+}
+html:not(.dark) .text-slate-400 {
+  color: #475569 !important;
+}
+html:not(.dark) .text-slate-500 {
+  color: #64748b !important;
+}
+html:not(.dark) .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+/* Borders */
+html:not(.dark) .border-slate-700 {
+  border-color: #cbd5e1 !important;
+}
+html:not(.dark) .border-slate-800 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Hover states */
+html:not(.dark) .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1 !important;
+}
+html:not(.dark) .hover\:border-slate-700:hover {
+  border-color: #94a3b8 !important;
+}
+html:not(.dark) .hover\:text-slate-200:hover {
+  color: #1e293b !important;
+}
+html:not(.dark) .hover\:text-slate-300:hover {
+  color: #334155 !important;
+}
+
+/* Skeleton shimmer needs lighter base colors in light mode */
+html:not(.dark) .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 1) 0%,
+    rgba(241, 245, 249, 1) 50%,
+    rgba(226, 232, 240, 1) 100%
+  );
+  background-size: 1000px 100%;
+}
+
+/* About modal backdrop needs to feel lighter */
+html:not(.dark) .bg-black\/70 {
+  background-color: rgb(15 23 42 / 0.4) !important;
+}
+
+/* Accent text colors: dark variants are too light for white backgrounds.
+   Push them one or two shades darker for readability in light mode. */
+html:not(.dark) .text-cyan-300 { color: #0e7490 !important; }
+html:not(.dark) .text-cyan-400 { color: #0891b2 !important; }
+html:not(.dark) .text-purple-300 { color: #7e22ce !important; }
+html:not(.dark) .text-purple-500 { color: #9333ea !important; }
+html:not(.dark) .text-emerald-200 { color: #047857 !important; }
+html:not(.dark) .text-emerald-300 { color: #059669 !important; }
+html:not(.dark) .text-rose-200 { color: #be123c !important; }
+html:not(.dark) .text-rose-300 { color: #e11d48 !important; }
+html:not(.dark) .text-rose-400 { color: #f43f5e !important; }
+html:not(.dark) .text-red-400 { color: #dc2626 !important; }
+
+/* Toast backgrounds (xxx-950/80) become white in our scheme; restore them */
+html:not(.dark) .bg-emerald-950\/80 { background-color: #ecfdf5 !important; }
+html:not(.dark) .bg-rose-950\/80 { background-color: #fff1f2 !important; }
+html:not(.dark) .bg-cyan-950\/80 { background-color: #ecfeff !important; }
+
 /* --------- Animations --------- */
 
 @keyframes fade-in {
@@ -52,7 +161,7 @@ body {
 .animate-slide-in-right { animation: slide-in-right 0.25s ease-out; }
 .animate-ticker { animation: ticker 40s linear infinite; }
 
-/* Loading skeleton shimmer */
+/* Loading skeleton shimmer (dark default) */
 .skeleton {
   background: linear-gradient(
     90deg,

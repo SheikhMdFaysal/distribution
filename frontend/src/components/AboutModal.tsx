@@ -74,8 +74,8 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
               label="LinkedIn"
             />
             <SocialLink
-              href="https://github.com/SheikhMdFaysal"
-              label="GitHub"
+              href="https://sheikhmdfaysal.github.io/SheikhMdFaysal/"
+              label="Portfolio"
             />
           </CreditRow>
 
