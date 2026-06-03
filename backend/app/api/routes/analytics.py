@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 
 from app.models.database import (
     get_session_local, SecurityTest, ModelRun, EvaluationScore,
-    RiskLevel, StyleVariant, BaselinePrompt
+    RiskLevel, StyleVariant, BaselinePrompt, TestStatus
 )
 
 router = APIRouter()
@@ -25,7 +25,7 @@ def get_dashboard_analytics(db: Session = Depends(get_db)):
     # Overall metrics
     total_tests = db.query(SecurityTest).count()
     completed_tests = db.query(SecurityTest).filter(
-        SecurityTest.status == SecurityTest.status.COMPLETED
+        SecurityTest.status == TestStatus.COMPLETED
     ).count()
     
     # Vulnerability metrics
