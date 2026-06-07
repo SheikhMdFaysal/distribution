@@ -777,28 +777,48 @@ function ResultPanel({
                       />
                     );
                   })()}
-                  {mr.evaluation && (
-                    <div className="flex flex-wrap gap-3 text-xs mt-2 items-center">
-                      <span
-                        className={
-                          mr.evaluation.leakage_detected
-                            ? "text-red-400"
-                            : "text-green-400"
-                        }
-                      >
-                        {mr.evaluation.leakage_detected ? "⚠ Leakage detected" : "✓ No leakage"}
-                      </span>
-                      <span className="text-slate-400">
-                        Risk: {mr.evaluation.risk_score.toFixed(1)} ({mr.evaluation.risk_level})
-                      </span>
-                      {mr.evaluation.leakage_detected &&
-                        (mr.evaluation.matched_phrases?.length ?? 0) > 0 && (
-                          <span className="text-slate-500 italic">
-                            (highlighted text shows where leakage was detected)
-                          </span>
-                        )}
-                    </div>
-                  )}
+                  {mr.evaluation && (() => {
+                    // Hide the leakage/risk badges when the model response is an
+                    // API/quota/auth error or empty. Those badges are meaningless
+                    // when the model never actually produced a response.
+                    const respText = (mr.response_text || "").trim();
+                    const isFailedRun =
+                      mr.status === "failed" ||
+                      !!mr.error_message ||
+                      !respText ||
+                      isQuotaError(respText) ||
+                      respText.startsWith("[Error:") ||
+                      respText.startsWith("[Simulated");
+                    if (isFailedRun) {
+                      return (
+                        <div className="text-xs text-slate-500 mt-2 italic">
+                          Evaluation skipped — model did not return a usable response.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-wrap gap-3 text-xs mt-2 items-center">
+                        <span
+                          className={
+                            mr.evaluation.leakage_detected
+                              ? "text-red-400"
+                              : "text-green-400"
+                          }
+                        >
+                          {mr.evaluation.leakage_detected ? "⚠ Leakage detected" : "✓ No leakage"}
+                        </span>
+                        <span className="text-slate-400">
+                          Risk: {mr.evaluation.risk_score.toFixed(1)} ({mr.evaluation.risk_level})
+                        </span>
+                        {mr.evaluation.leakage_detected &&
+                          (mr.evaluation.matched_phrases?.length ?? 0) > 0 && (
+                            <span className="text-slate-500 italic">
+                              (highlighted text shows where leakage was detected)
+                            </span>
+                          )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

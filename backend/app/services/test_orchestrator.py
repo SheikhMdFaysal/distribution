@@ -108,16 +108,20 @@ class TestOrchestrator:
         
         try:
             response = adapter.generate(variant.variant_text)
-            
+            response_text = response.get("response_text", "") or ""
+            metadata = response.get("metadata") or {}
+            is_error = TestOrchestrator._is_error_response(response_text, metadata)
+
             # Create model run record
             model_run = ModelRun(
                 style_variant_id=variant_id,
                 model_name=response["model_name"],
                 model_type=response["model_type"],
                 model_vendor=response["vendor"],
-                response_text=response["response_text"],
-                response_metadata=response["metadata"],
-                status="completed",
+                response_text=response_text,
+                response_metadata=metadata,
+                status="failed" if is_error else "completed",
+                error_message=metadata.get("error") if is_error else None,
                 completed_at=datetime.now(timezone.utc)
             )
         except Exception as e:
@@ -143,12 +147,59 @@ class TestOrchestrator:
         return model_run
     
     @staticmethod
+    def _is_error_response(response_text: str, metadata: Dict[str, Any]) -> bool:
+        """
+        Returns True if the adapter returned an API/quota/auth error in place of an
+        actual model response. We must NOT run leakage detection on such text,
+        because the error message itself ("Quota exceeded", "API_KEY_INVALID", etc.)
+        contains words that trigger false-positive leakage matches.
+        """
+        if metadata and metadata.get("error"):
+            return True
+        if not response_text or not response_text.strip():
+            return True
+        head = response_text[:200]
+        markers = (
+            "[Error:",
+            "[Simulated",
+            "RESOURCE_EXHAUSTED",
+            "API_KEY_INVALID",
+            "Quota exceeded",
+            "quota exceeded",
+            "Rate limit",
+            "rate limit",
+            "429 ",
+        )
+        return any(m in head for m in markers)
+
+    @staticmethod
     def evaluate_run(db: Session, model_run_id: int) -> EvaluationScore:
         """Evaluate a model run for leakage"""
         model_run = db.query(ModelRun).filter(ModelRun.id == model_run_id).first()
         if not model_run:
             raise ValueError(f"Model run {model_run_id} not found")
-        
+
+        # Skip leakage scoring for failed runs (quota errors, API errors, empty responses).
+        # Store a zero-risk record so the UI can still display the row without
+        # falsely flagging the error text as leakage.
+        if model_run.status != "completed":
+            evaluation = EvaluationScore(
+                model_run_id=model_run_id,
+                leakage_detected=False,
+                leakage_categories=[],
+                confidence_scores={},
+                evidence=__import__("json").dumps([]),
+                risk_score=0.0,
+                risk_level="LOW",
+                data_classification="UNCLASSIFIED",
+                compliance_violations=[],
+                vendor_promise="N/A (run failed before evaluation)",
+                promise_held=True,
+            )
+            db.add(evaluation)
+            db.commit()
+            return evaluation
+
         # Detect leakage
         detection_result = LeakageDetector.detect_leakage(
             response_text=model_run.response_text,
