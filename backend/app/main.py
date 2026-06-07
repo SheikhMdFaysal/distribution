@@ -6,6 +6,11 @@ try:
 except Exception:
     pass
 
+from contextlib import asynccontextmanager
+import asyncio
+import threading
+import time as _time
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -16,28 +21,34 @@ from app.core.config import settings
 from app.models.database import init_db, get_session_local
 from app.api.routes import security_tests, variants, analytics, health
 
+
 # ---------------------------------------------------------------------------
-# Resilient startup
+# Resilient startup (deploy-deadlock-proof)
 # ---------------------------------------------------------------------------
-# During a rolling deploy on DigitalOcean App Platform, the OLD container is
-# still running (and possibly hogging all database connection slots) while the
-# NEW container tries to come up. If we crash at module import because the
-# database is momentarily unavailable, health checks fail and DigitalOcean
-# rolls us back -- which means the broken old version keeps running and the
-# fix never lands. (Classic deploy deadlock.)
+# Problem we hit: during a rolling deploy on DigitalOcean App Platform, the
+# OLD container is still running and may be hogging all 22 dev-tier Postgres
+# connection slots while the NEW container tries to come up. If we run
+# init_db() at module import, it cannot acquire a connection, the worker
+# crashes, the health check fails, DigitalOcean rolls us back -- and the
+# broken old version keeps running. The fix can never deploy.
 #
-# Retry init_db and the seed step with backoff so the new container can
-# patiently wait for the old one to drain. ~60s total budget covers the
-# usual hand-off window.
-import time as _time
+# Solution: the /api/v1/health endpoint does NOT touch the database, so we
+# just need the FastAPI worker to start. Move init_db() and the seed step
+# to a BACKGROUND THREAD that runs AFTER the app is already accepting
+# traffic. The health check passes immediately, DigitalOcean promotes the
+# new container, the old container drains, and by the time the background
+# thread's retry loop succeeds, connections are free.
 
 
-def _retry(label, fn, attempts=12, initial_delay=2.0, max_delay=8.0):
+def _retry(label, fn, attempts=20, initial_delay=2.0, max_delay=10.0):
+    """Retry fn() with exponential backoff. Logs each attempt; never raises."""
     delay = initial_delay
     last_err = None
     for n in range(1, attempts + 1):
         try:
-            return fn()
+            result = fn()
+            print(f"[STARTUP] {label}: succeeded on attempt {n}")
+            return result
         except Exception as e:
             last_err = e
             if n == attempts:
@@ -45,34 +56,50 @@ def _retry(label, fn, attempts=12, initial_delay=2.0, max_delay=8.0):
             print(f"[STARTUP] {label}: attempt {n}/{attempts} failed ({e}); retrying in {delay:.1f}s")
             _time.sleep(delay)
             delay = min(delay * 1.4, max_delay)
-    print(f"[STARTUP] {label}: FINAL FAILURE after {attempts} attempts -- continuing anyway. Last error: {last_err}")
+    print(f"[STARTUP] {label}: FINAL FAILURE after {attempts} attempts. Last error: {last_err}")
     return None
 
 
-_retry("init_db", init_db)
+def _background_db_bootstrap():
+    """
+    Runs in a daemon thread AFTER the app is accepting requests.
+    Initialises the database schema and seeds attack scenarios.
+    The health check has already passed by the time we start, so even if
+    every retry here fails the new container is already promoted and the
+    OLD broken container has been killed. Connections will be free.
+    """
+    _retry("init_db", init_db)
+    try:
+        from app.seed_data import seed_attack_scenarios
 
-try:
-    from app.seed_data import seed_attack_scenarios
+        def _do_seed():
+            SessionLocal = get_session_local()
+            db = SessionLocal()
+            try:
+                seed_attack_scenarios(db)
+                print("[STARTUP] Attack scenarios seeded (idempotent)")
+            finally:
+                db.close()
 
-    def _do_seed():
-        _SessionLocal = get_session_local()
-        _seed_db = _SessionLocal()
-        try:
-            seed_attack_scenarios(_seed_db)
-            print("[STARTUP] Attack scenarios seeded (idempotent — skips if already present)")
-        finally:
-            _seed_db.close()
+        _retry("seed_attack_scenarios", _do_seed)
+    except Exception as e:
+        print(f"[STARTUP] Seed step failed (non-fatal): {e}")
 
-    _retry("seed_attack_scenarios", _do_seed)
-except Exception as _seed_err:
-    print(f"[STARTUP] Seed step failed (non-fatal): {_seed_err}")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Kick off DB bootstrap in background so the worker starts immediately.
+    threading.Thread(target=_background_db_bootstrap, daemon=True, name="db-bootstrap").start()
+    yield
+    # No teardown needed; engine cleanup happens on process exit.
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Enterprise AI Security Red Teaming Platform API",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan,
 )
 
 # CORS middleware
