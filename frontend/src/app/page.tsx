@@ -104,7 +104,17 @@ function DashboardInner() {
   const [statsRefreshKey, setStatsRefreshKey] = useState(0);
 
   useEffect(() => {
-    api.health().then(setHealth).catch((e: Error) => setError(e.message));
+    // Initial fetch
+    const refreshHealth = () => {
+      api
+        .health()
+        .then((h) => {
+          setHealth(h);
+          setError(null); // recover from previous offline state
+        })
+        .catch((e: Error) => setError(e.message));
+    };
+    refreshHealth();
     api
       .listScenarios()
       .then((s) => {
@@ -112,6 +122,12 @@ function DashboardInner() {
         if (s.length) setScenarioId(s[0].id);
       })
       .catch((e: Error) => setError(e.message));
+
+    // Re-check health every 45 seconds. Without this, a transient backend hiccup
+    // during cold start leaves the status dot stuck on "Offline" indefinitely
+    // even after the backend recovers.
+    const healthInterval = window.setInterval(refreshHealth, 45_000);
+    return () => window.clearInterval(healthInterval);
   }, []);
 
   // Cycle the progress stages while a test is running

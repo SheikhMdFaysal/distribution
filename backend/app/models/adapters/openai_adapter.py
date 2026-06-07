@@ -48,8 +48,13 @@ class OpenAIAdapter(ModelAdapter):
                     **default_params
                 )
                 
+                # response.choices[0].message.content can be None when the model
+                # returns an empty/filtered/safety-blocked response. Coerce to
+                # empty string so downstream code (which expects a string) does
+                # not crash with TypeError.
+                content = response.choices[0].message.content if response.choices else None
                 return {
-                    "response_text": response.choices[0].message.content,
+                    "response_text": content if content is not None else "",
                     "model_name": self.model,
                     "model_type": self.model_type,
                     "vendor": self.vendor,

@@ -74,35 +74,43 @@ def run_security_test(test_data: SecurityTestCreate, db: Session = Depends(get_d
         test = db.query(SecurityTest).filter(SecurityTest.id == test.id).first()
         total_completed = 0
         vulnerabilities_found = 0
-        
+        run_errors: List[str] = []  # collect errors instead of swallowing them
+
         for baseline in test.baseline_prompts:
             for variant in baseline.variants:
                 for model_config in test.target_models:
                     try:
-                        TestOrchestrator.execute_model_run(
+                        # execute_model_run returns the newly-created ModelRun.
+                        # Counting via the return value avoids the previous
+                        # double-counting bug, which re-iterated all of the
+                        # variant's prior runs and accumulated their leakage
+                        # counts on every loop pass.
+                        new_run = TestOrchestrator.execute_model_run(
                             db=db,
                             variant_id=variant.id,
-                            model_config=model_config
+                            model_config=model_config,
                         )
                         total_completed += 1
-                        
-                        # Check if vulnerability found
-                        if variant.model_runs:
-                            for run in variant.model_runs:
-                                if run.evaluation and run.evaluation.leakage_detected:
-                                    vulnerabilities_found += 1
+                        if new_run and new_run.evaluation and new_run.evaluation.leakage_detected:
+                            vulnerabilities_found += 1
                     except Exception as e:
-                        print(f"Error running model: {e}")
-        
-        # Update test completion
+                        # Don't crash the whole test if one model fails.
+                        # Capture for visibility instead of silent print().
+                        run_errors.append(f"{model_config.get('model', 'unknown')}: {e}")
+
+        # Update test completion (this also recomputes counts from the DB,
+        # so the DB stays authoritative even if the inline counters drift)
         TestOrchestrator.update_test_status(db, test.id)
-        
+
+        # Re-fetch to return the authoritative DB values rather than the inline counters
+        test = db.query(SecurityTest).filter(SecurityTest.id == test.id).first()
         return {
             "test_id": test.id,
-            "status": "completed",
+            "status": test.status.value if test.status else "completed",
             "message": "Test completed successfully",
-            "runs_completed": total_completed,
-            "vulnerabilities_found": vulnerabilities_found
+            "runs_completed": test.runs_completed or total_completed,
+            "vulnerabilities_found": test.vulnerabilities_found or vulnerabilities_found,
+            "errors": run_errors if run_errors else None,
         }
     except Exception as e:
         raise HTTPException(
