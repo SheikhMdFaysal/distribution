@@ -50,8 +50,12 @@ export function StatsWidget({ refreshKey = 0 }: StatsWidgetProps) {
   }, [fetchStats, refreshKey]);
 
   useEffect(() => {
-    // Auto-refresh every 15 seconds while the page is open
-    const id = window.setInterval(fetchStats, 15_000);
+    // Auto-refresh every 60 seconds while the page is open.
+    // (Lowered from 15s to reduce database connection pressure on the
+    // DigitalOcean dev-tier Postgres. Refresh is also triggered immediately
+    // when a test completes via the refreshKey prop, so the visible counters
+    // stay accurate.)
+    const id = window.setInterval(fetchStats, 60_000);
     return () => window.clearInterval(id);
   }, [fetchStats]);
 

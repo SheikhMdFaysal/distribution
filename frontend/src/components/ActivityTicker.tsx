@@ -27,7 +27,8 @@ export function ActivityTicker() {
         });
     };
     load();
-    const id = window.setInterval(load, 30_000);
+    // Poll every 60s (was 30s) to reduce database connection pressure.
+    const id = window.setInterval(load, 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

@@ -174,23 +174,51 @@ class EvaluationScore(Base):
     model_run = relationship("ModelRun", back_populates="evaluation")
 
 # Database setup
-def get_engine():
-    # Handle SQLite special requirements
-    if settings.DATABASE_URL.startswith('sqlite'):
+#
+# IMPORTANT: the engine and SessionLocal are cached at module level.
+# Previously get_session_local() created a brand-new engine on every request,
+# which spun up its own connection pool and quickly exhausted the database's
+# connection limit (DigitalOcean dev tier allows ~22 concurrent connections).
+# The cached singletons fix this and let SQLAlchemy reuse connections.
+_engine = None
+_SessionLocal = None
+
+
+def _build_engine():
+    """Create a single engine with pool settings appropriate for the deployment tier."""
+    if settings.DATABASE_URL.startswith("sqlite"):
         return create_engine(
             settings.DATABASE_URL,
-            connect_args={"check_same_thread": False}
+            connect_args={"check_same_thread": False},
         )
+    # Conservative pool sized for DigitalOcean dev-tier Postgres (~22 connection cap).
+    # 5 base + 5 overflow = 10 max from this app instance, leaves headroom for
+    # admin sessions, migrations, and any second instance.
     return create_engine(
         settings.DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=3600,
+        pool_size=5,
+        max_overflow=5,
+        pool_pre_ping=True,    # transparently drop stale connections
+        pool_recycle=1800,     # recycle every 30 min (safer than 1 hour)
+        pool_timeout=30,       # wait up to 30s for a connection before erroring
     )
 
+
+def get_engine():
+    """Return the module-level singleton engine, creating it on first call."""
+    global _engine
+    if _engine is None:
+        _engine = _build_engine()
+    return _engine
+
+
 def get_session_local():
-    engine = get_engine()
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal
+    """Return the module-level singleton sessionmaker, creating it on first call."""
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return _SessionLocal
+
 
 def init_db():
     engine = get_engine()
