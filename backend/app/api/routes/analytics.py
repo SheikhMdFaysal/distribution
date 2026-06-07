@@ -169,9 +169,9 @@ def get_recent_activity(limit: int = 15, db: Session = Depends(get_db)):
             SecurityTest.id.label("test_id"),
         )
         .join(EvaluationScore, ModelRun.id == EvaluationScore.model_run_id)
-        .join(StyleVariant, ModelRun.variant_id == StyleVariant.id)
-        .join(BaselinePrompt, StyleVariant.prompt_id == BaselinePrompt.id)
-        .join(SecurityTest, BaselinePrompt.test_id == SecurityTest.id)
+        .join(StyleVariant, ModelRun.style_variant_id == StyleVariant.id)
+        .join(BaselinePrompt, StyleVariant.baseline_prompt_id == BaselinePrompt.id)
+        .join(SecurityTest, BaselinePrompt.security_test_id == SecurityTest.id)
         .order_by(ModelRun.created_at.desc())
         .limit(min(limit, 50))
         .all()
