@@ -16,17 +16,54 @@ from app.core.config import settings
 from app.models.database import init_db, get_session_local
 from app.api.routes import security_tests, variants, analytics, health
 
-# Initialize database on startup + seed attack scenarios on first boot
-init_db()
+# ---------------------------------------------------------------------------
+# Resilient startup
+# ---------------------------------------------------------------------------
+# During a rolling deploy on DigitalOcean App Platform, the OLD container is
+# still running (and possibly hogging all database connection slots) while the
+# NEW container tries to come up. If we crash at module import because the
+# database is momentarily unavailable, health checks fail and DigitalOcean
+# rolls us back -- which means the broken old version keeps running and the
+# fix never lands. (Classic deploy deadlock.)
+#
+# Retry init_db and the seed step with backoff so the new container can
+# patiently wait for the old one to drain. ~60s total budget covers the
+# usual hand-off window.
+import time as _time
+
+
+def _retry(label, fn, attempts=12, initial_delay=2.0, max_delay=8.0):
+    delay = initial_delay
+    last_err = None
+    for n in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as e:
+            last_err = e
+            if n == attempts:
+                break
+            print(f"[STARTUP] {label}: attempt {n}/{attempts} failed ({e}); retrying in {delay:.1f}s")
+            _time.sleep(delay)
+            delay = min(delay * 1.4, max_delay)
+    print(f"[STARTUP] {label}: FINAL FAILURE after {attempts} attempts -- continuing anyway. Last error: {last_err}")
+    return None
+
+
+_retry("init_db", init_db)
+
 try:
     from app.seed_data import seed_attack_scenarios
-    _SessionLocal = get_session_local()
-    _seed_db = _SessionLocal()
-    try:
-        seed_attack_scenarios(_seed_db)
-        print("[STARTUP] Attack scenarios seeded (idempotent — skips if already present)")
-    finally:
-        _seed_db.close()
+
+    def _do_seed():
+        _SessionLocal = get_session_local()
+        _seed_db = _SessionLocal()
+        try:
+            seed_attack_scenarios(_seed_db)
+            print("[STARTUP] Attack scenarios seeded (idempotent — skips if already present)")
+        finally:
+            _seed_db.close()
+
+    _retry("seed_attack_scenarios", _do_seed)
 except Exception as _seed_err:
     print(f"[STARTUP] Seed step failed (non-fatal): {_seed_err}")
 
