@@ -191,13 +191,20 @@ def _build_engine():
             settings.DATABASE_URL,
             connect_args={"check_same_thread": False},
         )
-    # Conservative pool sized for DigitalOcean dev-tier Postgres (~22 connection cap).
-    # 5 base + 5 overflow = 10 max from this app instance, leaves headroom for
-    # admin sessions, migrations, and any second instance.
+    # Aggressively small pool sized for DigitalOcean dev-tier Postgres.
+    # The dev tier exposes only ~22 connections, AND Postgres reserves the
+    # last few for SUPERUSER. Effective ceiling for our role is ~17.
+    # During a rolling deploy, BOTH the old and new app instances run for
+    # 60-120 seconds, so the pool budget must fit twice within 17.
+    #
+    # 3 base + 2 overflow = 5 max per instance.
+    # Two instances during deploy = 10 connections. Leaves 7 for migrations,
+    # admin queries, and head-room. No more "remaining connection slots are
+    # reserved for roles with the SUPERUSER attribute" errors.
     return create_engine(
         settings.DATABASE_URL,
-        pool_size=5,
-        max_overflow=5,
+        pool_size=3,
+        max_overflow=2,
         pool_pre_ping=True,    # transparently drop stale connections
         pool_recycle=1800,     # recycle every 30 min (safer than 1 hour)
         pool_timeout=30,       # wait up to 30s for a connection before erroring
