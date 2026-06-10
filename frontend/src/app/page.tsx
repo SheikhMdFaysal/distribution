@@ -23,7 +23,6 @@ const FREE_MODELS = [
   { adapter: "google", model: "gemini-2.0-flash", vendor: "Google", label: "Gemini 2.0 Flash (Google)" },
   { adapter: "groq", model: "llama-3.1-8b-instant", vendor: "Groq", label: "Llama 3.1 8B Instant (Groq)" },
   { adapter: "groq", model: "llama-3.3-70b-versatile", vendor: "Groq", label: "Llama 3.3 70B (Groq)" },
-  { adapter: "openrouter", model: "inclusionai/ling-2.6-flash:free", vendor: "OpenRouter", label: "Ling 2.6 Flash free (OpenRouter)" },
   { adapter: "openrouter", model: "meta-llama/llama-3.2-3b-instruct:free", vendor: "OpenRouter", label: "Llama 3.2 3B Instruct free (OpenRouter)" },
   { adapter: "openrouter", model: "google/gemma-2-9b-it:free", vendor: "OpenRouter", label: "Gemma 2 9B Instruct free (OpenRouter)" },
   { adapter: "huggingface", model: "meta-llama/Llama-3.1-8B-Instruct", vendor: "HuggingFace", label: "Llama 3.1 8B Instruct (HuggingFace)" },
