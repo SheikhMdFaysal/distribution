@@ -24,9 +24,9 @@ const FREE_MODELS = [
   { adapter: "groq", model: "llama-3.1-8b-instant", vendor: "Groq", label: "Llama 3.1 8B Instant (Groq)" },
   { adapter: "groq", model: "llama-3.3-70b-versatile", vendor: "Groq", label: "Llama 3.3 70B (Groq)" },
   { adapter: "openrouter", model: "meta-llama/llama-3.2-3b-instruct:free", vendor: "OpenRouter", label: "Llama 3.2 3B Instruct free (OpenRouter)" },
-  { adapter: "openrouter", model: "google/gemma-2-9b-it:free", vendor: "OpenRouter", label: "Gemma 2 9B Instruct free (OpenRouter)" },
+  { adapter: "openrouter", model: "deepseek/deepseek-chat:free", vendor: "OpenRouter", label: "DeepSeek Chat free (OpenRouter)" },
   { adapter: "huggingface", model: "meta-llama/Llama-3.1-8B-Instruct", vendor: "HuggingFace", label: "Llama 3.1 8B Instruct (HuggingFace)" },
-  { adapter: "huggingface", model: "mistralai/Mistral-7B-Instruct-v0.3", vendor: "HuggingFace", label: "Mistral 7B Instruct (HuggingFace)" },
+  { adapter: "huggingface", model: "Qwen/Qwen2.5-7B-Instruct", vendor: "HuggingFace", label: "Qwen 2.5 7B Instruct (HuggingFace)" },
   { adapter: "nvidia", model: "meta/llama-3.1-8b-instruct", vendor: "NVIDIA", label: "Llama 3.1 8B Instruct (NVIDIA NIM)" },
   { adapter: "nvidia", model: "meta/llama-3.3-70b-instruct", vendor: "NVIDIA", label: "Llama 3.3 70B Instruct (NVIDIA NIM)" },
 ];
