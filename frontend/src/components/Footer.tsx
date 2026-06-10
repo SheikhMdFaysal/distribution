@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AboutModal } from "./AboutModal";
 
-const APP_VERSION = "1.1.11";
+const APP_VERSION = "1.1.12";
 const CURRENT_YEAR = new Date().getFullYear();
 
 /**

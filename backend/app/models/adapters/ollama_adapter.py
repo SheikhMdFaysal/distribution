@@ -135,10 +135,14 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
         from .openai_adapter import OpenAIAdapter
         from app.core.config import settings
         print("[ADAPTER FACTORY] -> Creating Hugging Face Adapter (OpenAI-compatible)")
+        # HuggingFace deprecated api-inference.huggingface.co in 2024 in favour
+        # of router.huggingface.co, which unifies 15+ inference providers behind
+        # a single OpenAI-compatible endpoint. The old URL now returns connection
+        # errors. Use the new router URL.
         return OpenAIAdapter(
             api_key=settings.HF_TOKEN or "demo-key",
             model=model_config.get("model", "meta-llama/Llama-3.1-8B-Instruct"),
-            base_url="https://api-inference.huggingface.co/v1",
+            base_url="https://router.huggingface.co/v1",
             vendor="huggingface",
         )
     elif adapter_type == "nvidia":
