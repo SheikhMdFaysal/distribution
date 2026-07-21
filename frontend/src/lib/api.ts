@@ -161,7 +161,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
+    const body = await res.text();
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body) as { detail?: string };
+      detail = parsed.detail || body;
+    } catch {
+      // App Platform returns an HTML via_upstream page when its proxy times
+      // out. Do not surface the entire HTML document in the dashboard.
+      if (body.includes("via_upstream") || body.includes("Error code: 502")) {
+        detail =
+          "The backend timed out while contacting OpenAI. Please try again in a moment.";
+      }
+    }
+    throw new Error(`API ${res.status}: ${detail}`);
   }
   return res.json() as Promise<T>;
 }

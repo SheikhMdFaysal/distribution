@@ -419,8 +419,8 @@ def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
         adapter = OpenAIAdapter(
             api_key=settings.OPENAI_API_KEY,
             model=settings.OPENAI_MODEL,
-            timeout=settings.MODEL_TIMEOUT_SECONDS,
-            max_retries=settings.MODEL_MAX_RETRIES,
+            timeout=settings.EXECUTIVE_SUMMARY_TIMEOUT_SECONDS,
+            max_retries=settings.EXECUTIVE_SUMMARY_MAX_RETRIES,
         )
         executive_summary = adapter.generate_executive_summary(
             EXECUTIVE_SUMMARY_SYSTEM_PROMPT,

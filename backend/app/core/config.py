@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # Model API Timeouts
     MODEL_TIMEOUT_SECONDS: int = 30
     MODEL_MAX_RETRIES: int = 3
+    # Executive summaries run inside a user-facing HTTP request. Keep this
+    # call below the platform proxy timeout and do not retry it in-band;
+    # retries would multiply the request duration and produce a proxy 502/504
+    # before FastAPI can return its own actionable error.
+    EXECUTIVE_SUMMARY_TIMEOUT_SECONDS: int = 20
+    EXECUTIVE_SUMMARY_MAX_RETRIES: int = 0
     
     # Test Configuration
     DEFAULT_VARIANTS_PER_TECHNIQUE: int = 2
