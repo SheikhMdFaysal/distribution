@@ -89,6 +89,30 @@ class OpenAIAdapter(ModelAdapter):
                     "model_version": self.model
                 }
             }
+
+    def generate_executive_summary(self, system_prompt: str, test_summary: str) -> str:
+        """Generate a concise executive summary from aggregated test findings.
+
+        Unlike ``generate``, this method surfaces provider errors to the caller so
+        an API route can return a clear, actionable error instead of presenting an
+        error string as if it were a completed summary.
+        """
+        if not self.client_openai:
+            raise RuntimeError("The OpenAI SDK is not installed or could not be initialized.")
+
+        response = self.client_openai.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": test_summary},
+            ],
+            max_completion_tokens=300,
+        )
+        content = response.choices[0].message.content if response.choices else None
+        if not content or not content.strip():
+            raise RuntimeError("OpenAI returned an empty executive summary.")
+
+        return content.strip()
     
     def get_model_info(self) -> Dict[str, str]:
         return {

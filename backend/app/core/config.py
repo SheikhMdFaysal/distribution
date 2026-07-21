@@ -6,7 +6,7 @@ import os
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Enterprise AI Security Red Teaming Platform"
-    APP_VERSION: str = "1.1.15"
+    APP_VERSION: str = "1.2.0"
     DEBUG: bool = False
     
     # Database
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     TOGETHER_API_KEY: Optional[str] = None
     
     # Model Configuration
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_MODEL: str = "gpt-5.6-sol"
     ANTHROPIC_MODEL: str = "claude-3-opus-20240229"
     GOOGLE_MODEL: str = "gemini-1.5-pro"
     

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 from datetime import datetime, timezone
 
+from app.core.config import settings
+from app.models.adapters.openai_adapter import OpenAIAdapter
 from app.models.database import get_session_local, SecurityTest, AttackScenario, TestStatus
 from app.services.test_orchestrator import TestOrchestrator
 
@@ -41,6 +43,75 @@ class SecurityTestResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+EXECUTIVE_SUMMARY_SYSTEM_PROMPT = """You write executive summaries for a CEO or compliance officer.
+Write exactly 3-4 plain-English sentences about this completed AI security test.
+Explain the business risk, identify the most important finding and affected systems or models,
+mention relevant compliance obligations when present, and end with a clear next step. Avoid
+technical jargon, implementation details, hedging, bullet points, and invented facts."""
+
+
+def _as_string_list(value: object) -> List[str]:
+    """Normalize JSON-backed values into a deduplicated list of display strings."""
+    if not isinstance(value, list):
+        return []
+    return sorted({str(item) for item in value if item})
+
+
+def _build_executive_summary_context(test: SecurityTest) -> str:
+    """Build compact, aggregated evidence for the executive-summary model prompt."""
+    models_tested: Set[str] = set()
+    risk_levels: Dict[str, int] = {}
+    vulnerability_categories: Set[str] = set()
+    compliance_frameworks: Set[str] = set(_as_string_list(
+        test.attack_scenario.compliance_frameworks if test.attack_scenario else []
+    ))
+    total_variants = 0
+    total_runs = 0
+    vulnerabilities_found = 0
+
+    for baseline_prompt in test.baseline_prompts:
+        for variant in baseline_prompt.variants:
+            total_variants += 1
+            for model_run in variant.model_runs:
+                total_runs += 1
+                models_tested.add(model_run.model_name)
+                evaluation = model_run.evaluation
+                if not evaluation:
+                    continue
+
+                risk_level = evaluation.risk_level.value if evaluation.risk_level else "Unknown"
+                risk_levels[risk_level] = risk_levels.get(risk_level, 0) + 1
+                if evaluation.leakage_detected:
+                    vulnerabilities_found += 1
+                    vulnerability_categories.update(_as_string_list(evaluation.leakage_categories))
+                compliance_frameworks.update(_as_string_list(evaluation.compliance_violations))
+
+    configured_models = set()
+    if isinstance(test.target_models, list):
+        configured_models = {
+            str(model.get("model"))
+            for model in test.target_models
+            if isinstance(model, dict) and model.get("model")
+        }
+    models_tested.update(configured_models)
+    scenario_name = test.attack_scenario.scenario_name if test.attack_scenario else "Unspecified scenario"
+    risk_level_text = ", ".join(
+        f"{level}: {count}" for level, count in sorted(risk_levels.items())
+    ) or "No completed evaluations"
+
+    return "\n".join([
+        f"Scenario: {scenario_name}",
+        f"Test name: {test.test_name}",
+        f"Models tested: {', '.join(sorted(models_tested)) or 'None recorded'}",
+        f"Baseline prompts: {len(test.baseline_prompts)}; variants: {total_variants}; model runs: {total_runs}",
+        f"Vulnerabilities found: {vulnerabilities_found}",
+        f"Risk levels across evaluated runs: {risk_level_text}",
+        f"Vulnerability categories: {', '.join(sorted(vulnerability_categories)) or 'None detected'}",
+        f"Compliance frameworks implicated: {', '.join(sorted(compliance_frameworks)) or 'None recorded'}",
+        f"Overall test risk: {test.risk_level.value if test.risk_level else 'Not calculated'}",
+    ])
 
 
 @router.post("/security-tests/run", response_model=dict)
@@ -320,6 +391,48 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
         "started_at": test.started_at.isoformat() if test.started_at else None,
         "completed_at": test.completed_at.isoformat() if test.completed_at else None
     }
+
+
+@router.post("/security-tests/{test_id}/executive-summary", response_model=dict)
+def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
+    """Generate a plain-English executive summary for a completed security test."""
+    test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()
+    if not test:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test {test_id} not found",
+        )
+
+    if test.status != TestStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Executive summaries are available after a security test is completed.",
+        )
+
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Executive Summary is unavailable because the OPENAI_API_KEY is not configured.",
+        )
+
+    try:
+        adapter = OpenAIAdapter(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.OPENAI_MODEL,
+            timeout=settings.MODEL_TIMEOUT_SECONDS,
+            max_retries=settings.MODEL_MAX_RETRIES,
+        )
+        executive_summary = adapter.generate_executive_summary(
+            EXECUTIVE_SUMMARY_SYSTEM_PROMPT,
+            _build_executive_summary_context(test),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Executive Summary could not be generated: {str(exc)}",
+        ) from exc
+
+    return {"test_id": test_id, "executive_summary": executive_summary}
 
 
 @router.get("/security-tests/{test_id}/status", response_model=dict)

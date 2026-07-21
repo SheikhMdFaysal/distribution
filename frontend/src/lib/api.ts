@@ -99,6 +99,11 @@ export interface RunTestResponse {
   vulnerabilities_found: number;
 }
 
+export interface ExecutiveSummaryResponse {
+  test_id: number;
+  executive_summary: string;
+}
+
 export interface VendorComparisonRow {
   vendor: string;
   model: string;
@@ -174,6 +179,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getTest: (id: number) => request<TestRunDetails>(`/api/v1/security-tests/${id}`),
+  generateExecutiveSummary: (id: number) =>
+    request<ExecutiveSummaryResponse>(`/api/v1/security-tests/${id}/executive-summary`, {
+      method: "POST",
+    }),
   vendorComparison: () =>
     request<VendorComparisonResponse>("/api/v1/analytics/vendor-comparison"),
   dashboardAnalytics: () =>

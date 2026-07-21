@@ -646,6 +646,10 @@ function ResultPanel({
   apiBase: string;
   scenarios: AttackScenario[];
 }) {
+  const [executiveSummary, setExecutiveSummary] = useState<string | null>(null);
+  const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(false);
+  const [executiveSummaryError, setExecutiveSummaryError] = useState<string | null>(null);
+
   const riskColor =
     result.risk_level === "HIGH"
       ? "text-red-400"
@@ -664,6 +668,24 @@ function ResultPanel({
   const hasVulnerability = result.baseline_prompts.some((bp) =>
     bp.variants.some((v) => v.model_runs.some((r) => r.evaluation?.leakage_detected))
   );
+
+  const generateExecutiveSummary = async () => {
+    setExecutiveSummaryLoading(true);
+    setExecutiveSummaryError(null);
+    setExecutiveSummary(null);
+    try {
+      const response = await api.generateExecutiveSummary(result.id);
+      setExecutiveSummary(response.executive_summary);
+    } catch (error) {
+      setExecutiveSummaryError(
+        error instanceof Error
+          ? "We couldn't generate an executive summary right now. Please check that OpenAI is configured and try again."
+          : "We couldn't generate an executive summary right now. Please try again."
+      );
+    } finally {
+      setExecutiveSummaryLoading(false);
+    }
+  };
 
   return (
     <section className="rounded-xl bg-slate-900 border border-slate-800 p-6">
@@ -716,6 +738,30 @@ function ResultPanel({
           color={riskColor}
         />
         <Metric label="Risk level" value={result.risk_level ?? "—"} color={riskColor} />
+      </div>
+
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={generateExecutiveSummary}
+          disabled={executiveSummaryLoading}
+          className="text-sm px-4 py-2 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 transition"
+        >
+          {executiveSummaryLoading ? "Generating Executive Summary..." : "Generate Executive Summary"}
+        </button>
+
+        {executiveSummaryError && (
+          <p className="mt-3 text-sm text-amber-300">{executiveSummaryError}</p>
+        )}
+
+        {executiveSummary && (
+          <div className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-300">
+              Executive Summary
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-200">{executiveSummary}</p>
+          </div>
+        )}
       </div>
 
       {hasVulnerability && (
