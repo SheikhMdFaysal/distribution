@@ -101,7 +101,9 @@ export interface RunTestResponse {
 
 export interface ExecutiveSummaryResponse {
   test_id: number;
-  executive_summary: string;
+  job_id: string;
+  status: "processing" | "completed";
+  executive_summary?: string;
 }
 
 export interface VendorComparisonRow {
@@ -196,6 +198,10 @@ export const api = {
     request<ExecutiveSummaryResponse>(`/api/v1/security-tests/${id}/executive-summary`, {
       method: "POST",
     }),
+  getExecutiveSummary: (id: number, jobId: string) =>
+    request<ExecutiveSummaryResponse>(
+      `/api/v1/security-tests/${id}/executive-summary/${jobId}`,
+    ),
   vendorComparison: () =>
     request<VendorComparisonResponse>("/api/v1/analytics/vendor-comparison"),
   dashboardAnalytics: () =>

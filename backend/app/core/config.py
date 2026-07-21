@@ -50,12 +50,19 @@ class Settings(BaseSettings):
     # Model API Timeouts
     MODEL_TIMEOUT_SECONDS: int = 30
     MODEL_MAX_RETRIES: int = 3
-    # Executive summaries run inside a user-facing HTTP request. Keep this
-    # call below the platform proxy timeout and do not retry it in-band;
-    # retries would multiply the request duration and produce a proxy 502/504
-    # before FastAPI can return its own actionable error.
-    EXECUTIVE_SUMMARY_TIMEOUT_SECONDS: int = 20
+    # Executive summaries run in a background job, so they are not constrained
+    # by the App Platform request proxy. Allow the model enough time to finish
+    # while keeping the worker bounded if the provider is unavailable.
+    EXECUTIVE_SUMMARY_TIMEOUT_SECONDS: int = 60
     EXECUTIVE_SUMMARY_MAX_RETRIES: int = 0
+    EXECUTIVE_SUMMARY_SYSTEM_PROMPT: str = (
+        "You write executive summaries for a CEO or compliance officer. "
+        "Write exactly 3-4 plain-English sentences about this completed AI security test. "
+        "Explain the business risk, identify the most important finding and affected systems "
+        "or models, mention relevant compliance obligations when present, and end with a clear "
+        "next step. Avoid technical jargon, implementation details, hedging, bullet points, "
+        "and invented facts."
+    )
     
     # Test Configuration
     DEFAULT_VARIANTS_PER_TECHNIQUE: int = 2

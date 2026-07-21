@@ -5,8 +5,8 @@ from typing import Dict, List, Optional, Set
 from datetime import datetime, timezone
 
 from app.core.config import settings
-from app.models.adapters.openai_adapter import OpenAIAdapter
 from app.models.database import get_session_local, SecurityTest, AttackScenario, TestStatus
+from app.services.executive_summary_jobs import get_summary_job, start_summary_job
 from app.services.test_orchestrator import TestOrchestrator
 
 router = APIRouter()
@@ -43,13 +43,6 @@ class SecurityTestResponse(BaseModel):
     
     class Config:
         from_attributes = True
-
-
-EXECUTIVE_SUMMARY_SYSTEM_PROMPT = """You write executive summaries for a CEO or compliance officer.
-Write exactly 3-4 plain-English sentences about this completed AI security test.
-Explain the business risk, identify the most important finding and affected systems or models,
-mention relevant compliance obligations when present, and end with a clear next step. Avoid
-technical jargon, implementation details, hedging, bullet points, and invented facts."""
 
 
 def _as_string_list(value: object) -> List[str]:
@@ -393,9 +386,9 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/security-tests/{test_id}/executive-summary", response_model=dict)
+@router.post("/security-tests/{test_id}/executive-summary", response_model=dict, status_code=status.HTTP_202_ACCEPTED)
 def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
-    """Generate a plain-English executive summary for a completed security test."""
+    """Start background generation of a plain-English executive summary."""
     test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()
     if not test:
         raise HTTPException(
@@ -415,24 +408,22 @@ def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
             detail="Executive Summary is unavailable because the OPENAI_API_KEY is not configured.",
         )
 
-    try:
-        adapter = OpenAIAdapter(
-            api_key=settings.OPENAI_API_KEY,
-            model=settings.OPENAI_MODEL,
-            timeout=settings.EXECUTIVE_SUMMARY_TIMEOUT_SECONDS,
-            max_retries=settings.EXECUTIVE_SUMMARY_MAX_RETRIES,
-        )
-        executive_summary = adapter.generate_executive_summary(
-            EXECUTIVE_SUMMARY_SYSTEM_PROMPT,
-            _build_executive_summary_context(test),
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Executive Summary could not be generated: {str(exc)}",
-        ) from exc
+    job_id = start_summary_job(test_id, _build_executive_summary_context(test))
+    return {"test_id": test_id, "job_id": job_id, "status": "processing"}
 
-    return {"test_id": test_id, "executive_summary": executive_summary}
+
+@router.get("/security-tests/{test_id}/executive-summary/{job_id}", response_model=dict)
+def get_executive_summary_job(test_id: int, job_id: str):
+    """Return the current status or completed result of an executive-summary job."""
+    job = get_summary_job(job_id, test_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Executive Summary job not found",
+        )
+    if job["status"] == "failed":
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=job["error"])
+    return job
 
 
 @router.get("/security-tests/{test_id}/status", response_model=dict)

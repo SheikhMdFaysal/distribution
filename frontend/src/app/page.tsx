@@ -674,7 +674,16 @@ function ResultPanel({
     setExecutiveSummaryError(null);
     setExecutiveSummary(null);
     try {
-      const response = await api.generateExecutiveSummary(result.id);
+      const job = await api.generateExecutiveSummary(result.id);
+      const deadline = Date.now() + 120_000;
+      let response = job;
+      while (response.status === "processing" && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        response = await api.getExecutiveSummary(result.id, job.job_id);
+      }
+      if (!response.executive_summary) {
+        throw new Error("Executive Summary is taking too long. Please try again.");
+      }
       setExecutiveSummary(response.executive_summary);
     } catch (error) {
       // Surface the actual backend error (404/400/503/502 with detail) instead of
