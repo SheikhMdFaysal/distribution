@@ -26,7 +26,20 @@ class OpenAIAdapter(ModelAdapter):
             kwargs = {"api_key": api_key}
             if base_url:
                 kwargs["base_url"] = base_url
-            self.client_openai = openai.OpenAI(**kwargs)
+            # IMPORTANT: timeout/max_retries must be passed to the actual SDK
+            # client, not just stored on this adapter. Without this, the OpenAI
+            # SDK falls back to its own internal default timeout (several
+            # minutes) and its own default retry/backoff behavior. If a call
+            # is slow or stuck, it can run far longer than DigitalOcean's own
+            # upstream proxy timeout, which then gives up first and returns a
+            # generic "via_upstream" 502 page -- even though our own try/except
+            # error handling never got a chance to run because the request
+            # never actually finished.
+            self.client_openai = openai.OpenAI(
+                timeout=timeout,
+                max_retries=max_retries,
+                **kwargs,
+            )
         except ImportError:
             self.client_openai = None
     
