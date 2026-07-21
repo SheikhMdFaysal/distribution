@@ -26,7 +26,13 @@ class Settings(BaseSettings):
     TOGETHER_API_KEY: Optional[str] = None
     
     # Model Configuration
-    OPENAI_MODEL: str = "gpt-5.6-sol"
+    # gpt-4o-mini is a known-good, universally-available OpenAI model. It was
+    # the original default. We tried "gpt-5.6-sol" (Codex's guess for the new
+    # GPT-5.6 flagship) but the OpenAI API rejected it in ~1 second, which means
+    # that model ID is either not real or not enabled on this account/tier.
+    # Ship a working model; the Build Week story is "built WITH Codex/GPT-5.6",
+    # which refers to the development tool, not the runtime summariser model.
+    OPENAI_MODEL: str = "gpt-4o-mini"
     ANTHROPIC_MODEL: str = "claude-3-opus-20240229"
     GOOGLE_MODEL: str = "gemini-1.5-pro"
     
