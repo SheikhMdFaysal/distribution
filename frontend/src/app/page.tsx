@@ -647,6 +647,7 @@ function ResultPanel({
   scenarios: AttackScenario[];
 }) {
   const [executiveSummary, setExecutiveSummary] = useState<string | null>(null);
+  const [executiveSummaryFallback, setExecutiveSummaryFallback] = useState(false);
   const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(false);
   const [executiveSummaryError, setExecutiveSummaryError] = useState<string | null>(null);
 
@@ -673,6 +674,7 @@ function ResultPanel({
     setExecutiveSummaryLoading(true);
     setExecutiveSummaryError(null);
     setExecutiveSummary(null);
+    setExecutiveSummaryFallback(false);
     try {
       const job = await api.generateExecutiveSummary(result.id);
       const deadline = Date.now() + 120_000;
@@ -685,6 +687,7 @@ function ResultPanel({
         throw new Error("Executive Summary is taking too long. Please try again.");
       }
       setExecutiveSummary(response.executive_summary);
+      setExecutiveSummaryFallback(response.fallback === true);
     } catch (error) {
       // Surface the actual backend error (404/400/503/502 with detail) instead of
       // a generic message, so failures are diagnosable without opening DevTools.
@@ -768,6 +771,11 @@ function ResultPanel({
             <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-300">
               Executive Summary
             </h3>
+            {executiveSummaryFallback && (
+              <p className="mt-2 text-xs text-amber-300">
+                OpenAI was unavailable, so this summary was assembled directly from the test results.
+              </p>
+            )}
             <p className="mt-2 text-sm leading-6 text-slate-200">{executiveSummary}</p>
           </div>
         )}

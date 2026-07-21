@@ -104,6 +104,7 @@ export interface ExecutiveSummaryResponse {
   job_id: string;
   status: "processing" | "completed";
   executive_summary?: string;
+  fallback?: boolean;
 }
 
 export interface VendorComparisonRow {

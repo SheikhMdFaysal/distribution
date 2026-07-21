@@ -14,6 +14,27 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 _jobs_lock = Lock()
 
 
+def _fallback_summary(context: str) -> str:
+    """Create a deterministic business summary when OpenAI is unavailable."""
+    values: Dict[str, str] = {}
+    for line in context.splitlines():
+        key, separator, value = line.partition(":")
+        if separator:
+            values[key.strip()] = value.strip()
+
+    scenario = values.get("Scenario", "The security test")
+    models = values.get("Models tested", "the configured AI models")
+    vulnerabilities = values.get("Vulnerabilities found", "an unknown number of")
+    risk = values.get("Overall test risk", "an uncalculated")
+    frameworks = values.get("Compliance frameworks implicated", "no specific frameworks")
+    return (
+        f"The {scenario} assessment evaluated {models} for unintended data exposure. "
+        f"It found {vulnerabilities} vulnerabilities, with an overall risk level of {risk}. "
+        f"The results should be reviewed against {frameworks}, and the next step is to address "
+        "any high-risk findings before relying on the affected AI systems in production."
+    )
+
+
 def _run_summary(job_id: str, test_id: int, context: str) -> None:
     """Run OpenAI work outside the request thread and record its outcome."""
     try:
@@ -34,11 +55,23 @@ def _run_summary(job_id: str, test_id: int, context: str) -> None:
             "executive_summary": summary,
         }
     except Exception as exc:
+        # Print the FULL exception (type + message) to Runtime Logs so the real
+        # OpenAI error (invalid_api_key / model_not_found / insufficient_quota /
+        # connection error) is finally visible for diagnosis. Previously this
+        # error was only stored in the job dict and the frontend re-labelled it
+        # as a generic "timed out" message, which hid the true cause.
+        print(
+            f"[EXECUTIVE SUMMARY] job {job_id} FAILED "
+            f"({type(exc).__name__}): {exc}",
+            flush=True,
+        )
         result = {
             "test_id": test_id,
             "job_id": job_id,
-            "status": "failed",
-            "error": f"Executive Summary could not be generated: {exc}",
+            "status": "completed",
+            "executive_summary": _fallback_summary(context),
+            "fallback": True,
+            "error": f"{type(exc).__name__}: {exc}",
         }
 
     with _jobs_lock:
