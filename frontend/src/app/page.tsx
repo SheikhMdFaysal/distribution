@@ -223,13 +223,21 @@ function DashboardInner() {
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
-              Enterprise AI Security Red Teaming Platform
-            </h1>
-            <p className="mt-2 text-slate-400">
-              Stress-test AI models for security vulnerabilities and compliance risks.
-            </p>
+          <div className="flex items-start gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.jpeg"
+              alt="Platform logo"
+              className="h-14 w-14 rounded-2xl shrink-0"
+            />
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+                Enterprise AI Security Red Teaming Platform
+              </h1>
+              <p className="mt-2 text-slate-400">
+                Stress-test AI models for security vulnerabilities and compliance risks.
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <StatusDot health={health} error={error} />
