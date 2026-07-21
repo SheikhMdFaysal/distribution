@@ -28,3 +28,7 @@ Thumbs.db
 # Environment
 .env
 *.env.local
+
+# Internal Build Week handoff doc (contains personal/immigration notes - never commit to public repo)
+OpenAI_Build_Week_Handoff_Farhad.pdf
+OpenAI_Build_Week_Handoff_Farhad.docx

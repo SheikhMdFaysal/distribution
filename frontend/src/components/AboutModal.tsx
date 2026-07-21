@@ -7,7 +7,7 @@ interface AboutModalProps {
   onClose: () => void;
 }
 
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.3.2";
 
 /**
  * Modal showing platform credits, sponsor info, and origin.
@@ -81,6 +81,8 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
 
           <CreditRow label="Industry Sponsor" name="Dr. Ray Hsu" />
 
+          <CreditRow label="OpenAI Build Week Collaborator" name="Farhad Kabir" />
+
           <div className="pt-2 border-t border-slate-800">
             <p className="text-xs text-slate-500 leading-relaxed">
               Originally built as the INFO 588 Capstone project at the{" "}
@@ -92,7 +94,7 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
           </div>
 
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-500">© 2026 Ada Analytics</span>
+            <span className="text-slate-500">© 2026 Sheikh Md Faysal</span>
             <a
               href="https://github.com/SheikhMdFaysal/distribution"
               target="_blank"

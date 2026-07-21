@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AboutModal } from "./AboutModal";
 
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.3.2";
 const CURRENT_YEAR = new Date().getFullYear();
 
 /**
@@ -18,7 +18,7 @@ export function Footer() {
       <footer className="mt-16 border-t border-slate-800 bg-slate-950 text-slate-500">
         <div className="mx-auto max-w-6xl px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3">
-            <span>© {CURRENT_YEAR} Ada Analytics. All rights reserved.</span>
+            <span>© {CURRENT_YEAR} Sheikh Md Faysal. All rights reserved.</span>
           </div>
           <div className="flex items-center gap-4">
             <button

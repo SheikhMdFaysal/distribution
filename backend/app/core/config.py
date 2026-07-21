@@ -6,7 +6,7 @@ import os
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Enterprise AI Security Red Teaming Platform"
-    APP_VERSION: str = "1.3.1"
+    APP_VERSION: str = "1.3.2"
     DEBUG: bool = False
     
     # Database
