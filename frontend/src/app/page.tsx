@@ -677,11 +677,11 @@ function ResultPanel({
       const response = await api.generateExecutiveSummary(result.id);
       setExecutiveSummary(response.executive_summary);
     } catch (error) {
-      setExecutiveSummaryError(
-        error instanceof Error
-          ? "We couldn't generate an executive summary right now. Please check that OpenAI is configured and try again."
-          : "We couldn't generate an executive summary right now. Please try again."
-      );
+      // Surface the actual backend error (404/400/503/502 with detail) instead of
+      // a generic message, so failures are diagnosable without opening DevTools.
+      const raw = error instanceof Error ? error.message : String(error);
+      const detailMatch = raw.match(/"detail"\s*:\s*"([^"]+)"/);
+      setExecutiveSummaryError(detailMatch ? detailMatch[1] : raw);
     } finally {
       setExecutiveSummaryLoading(false);
     }
