@@ -21,8 +21,8 @@ import { ActivityTicker } from "@/components/ActivityTicker";
 const FREE_MODELS = [
   { adapter: "google", model: "gemini-2.5-flash", vendor: "Google", label: "Gemini 2.5 Flash (Google)" },
   { adapter: "google", model: "gemini-2.0-flash", vendor: "Google", label: "Gemini 2.0 Flash (Google)" },
-  { adapter: "groq", model: "llama-3.1-8b-instant", vendor: "Groq", label: "Llama 3.1 8B Instant (Groq)" },
-  { adapter: "groq", model: "llama-3.3-70b-versatile", vendor: "Groq", label: "Llama 3.3 70B (Groq)" },
+  { adapter: "groq", model: "openai/gpt-oss-20b", vendor: "Groq", label: "GPT-OSS 20B (Groq)" },
+  { adapter: "groq", model: "openai/gpt-oss-120b", vendor: "Groq", label: "GPT-OSS 120B (Groq)" },
   { adapter: "openrouter", model: "meta-llama/llama-3.2-3b-instruct:free", vendor: "OpenRouter", label: "Llama 3.2 3B Instruct free (OpenRouter — may rate-limit)" },
   { adapter: "huggingface", model: "meta-llama/Llama-3.1-8B-Instruct", vendor: "HuggingFace", label: "Llama 3.1 8B Instruct (HuggingFace)" },
   { adapter: "huggingface", model: "Qwen/Qwen2.5-7B-Instruct", vendor: "HuggingFace", label: "Qwen 2.5 7B Instruct (HuggingFace)" },

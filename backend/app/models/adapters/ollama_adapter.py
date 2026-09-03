@@ -117,7 +117,7 @@ def create_adapter(model_config: Dict[str, Any]) -> ModelAdapter:
         print("[ADAPTER FACTORY] -> Creating Groq Adapter (OpenAI-compatible)")
         return OpenAIAdapter(
             api_key=settings.GROQ_API_KEY or "demo-key",
-            model=model_config.get("model", "llama-3.1-8b-instant"),
+            model=model_config.get("model", "openai/gpt-oss-20b"),
             base_url="https://api.groq.com/openai/v1",
             vendor="groq",
         )
