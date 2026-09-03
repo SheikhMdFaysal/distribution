@@ -1,0 +1,65 @@
+# Render Blueprint — Enterprise AI Security Red Teaming Platform (backend only)
+#
+# This is the SECOND migration this project has done:
+#   Render (free Postgres expired after 30 days) -> DigitalOcean (Student Pack
+#   credits expired, standard billing kicked in) -> back to Render + Neon + Vercel.
+#
+# This time the database lives on Neon (neon.tech), NOT Render's own free
+# Postgres -- that's what expired last time. Render only hosts the backend
+# web service here. The frontend goes to Vercel (better fit for Next.js,
+# no cold starts on the frontend even though the backend will have some).
+#
+# Deploy: https://render.com/deploy -> connect SheikhMdFaysal/distribution -> confirm.
+#
+# IMPORTANT: After the blueprint creates the service, set these in the
+# Render dashboard (Environment tab):
+#   DATABASE_URL          - paste your Neon connection string (see migration guide)
+#   SECRET_KEY            - Render can auto-generate this (already configured below)
+#   GOOGLE_API_KEY        - https://aistudio.google.com/apikey
+#   OPENROUTER_API_KEY    - https://openrouter.ai/keys
+#   GROQ_API_KEY          - https://console.groq.com/keys
+#   HF_TOKEN              - https://huggingface.co/settings/tokens
+#   NVIDIA_API_KEY        - https://build.nvidia.com
+#   OPENAI_API_KEY        - https://platform.openai.com/api-keys
+#   ALLOWED_ORIGINS       - your Vercel frontend URL, once you have it
+
+services:
+  # ---------- FastAPI backend ----------
+  - type: web
+    name: ai-security-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false  # Paste your Neon connection string here manually
+      - key: ALLOWED_ORIGINS
+        sync: false  # Set to your Vercel frontend URL after it's deployed
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_MODEL
+        value: gemini-2.5-flash
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OLLAMA_BASE_URL
+        value: ""  # No Ollama in cloud — leave empty
