@@ -41,8 +41,12 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3"
     
     # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production"
-    API_KEYS: str = "demo-api-key-123"
+    # No production defaults: leave these empty so a misconfigured deploy fails
+    # loudly (see app/core/auth.py and the validator below) instead of silently
+    # running with a publicly-known secret. Set real values via env vars.
+    # In DEBUG mode the demo key below is allowed for local development only.
+    SECRET_KEY: str = ""
+    API_KEYS: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     
     # CORS
@@ -79,5 +83,16 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+    def apply_dev_fallbacks(self) -> "Settings":
+        """In DEBUG only, fill empty secrets with local-dev placeholders so the
+        app is usable out of the box. Production (DEBUG=False) keeps them empty
+        and auth enforcement rejects requests until real values are set."""
+        if self.DEBUG:
+            if not self.SECRET_KEY:
+                self.SECRET_KEY = "dev-only-secret-key"
+            if not self.API_KEYS:
+                self.API_KEYS = "demo-api-key-123"
+        return self
 
-settings = Settings()
+
+settings = Settings().apply_dev_fallbacks()

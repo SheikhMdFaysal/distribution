@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Set
 from datetime import datetime, timezone
 
 from app.core.config import settings
+from app.core.auth import require_api_key
+from app.core.rate_limit import limiter
 from app.models.database import get_session_local, SecurityTest, AttackScenario, TestStatus
 from app.services.executive_summary_jobs import get_summary_job, start_summary_job
 from app.services.test_orchestrator import TestOrchestrator
@@ -107,9 +109,22 @@ def _build_executive_summary_context(test: SecurityTest) -> str:
     ])
 
 
-@router.post("/security-tests/run", response_model=dict)
-def run_security_test(test_data: SecurityTestCreate, db: Session = Depends(get_db)):
+@router.post("/security-tests/run", response_model=dict, dependencies=[Depends(require_api_key)])
+@limiter.limit("5/minute")
+def run_security_test(request: Request, test_data: SecurityTestCreate, db: Session = Depends(get_db)):
     """Create and run a new security test (synchronous execution)"""
+    # Enforce the configured cap so an unauthenticated-sized payload can't fan
+    # out into an unbounded number of paid model calls (baseline x variants x models).
+    if len(test_data.baseline_prompts) > settings.MAX_BASELINE_PROMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Too many baseline prompts: {len(test_data.baseline_prompts)} (max {settings.MAX_BASELINE_PROMPTS}).",
+        )
+    if not test_data.baseline_prompts:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one baseline prompt is required.",
+        )
     try:
         # Create test
         test = TestOrchestrator.create_test(
@@ -211,7 +226,7 @@ def list_security_tests(
     }
 
 
-@router.delete("/security-tests/{test_id}")
+@router.delete("/security-tests/{test_id}", dependencies=[Depends(require_api_key)])
 def delete_security_test(test_id: int, db: Session = Depends(get_db)):
     """Delete a security test and all associated data"""
     test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()
@@ -242,7 +257,7 @@ def delete_security_test(test_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/security-tests/{test_id}/cancel")
+@router.post("/security-tests/{test_id}/cancel", dependencies=[Depends(require_api_key)])
 def cancel_security_test(test_id: int, db: Session = Depends(get_db)):
     """Cancel a running security test"""
     test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()
@@ -386,7 +401,7 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/security-tests/{test_id}/executive-summary", response_model=dict, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/security-tests/{test_id}/executive-summary", response_model=dict, status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_api_key)])
 def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
     """Start background generation of a plain-English executive summary."""
     test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()
@@ -559,8 +574,19 @@ def export_test_results(test_id: int, format: str = Query("csv", pattern="^(csv|
         elements.append(Spacer(1, 20))
         elements.append(Paragraph(f"<b>Test Name:</b> {test.test_name}", normal_style))
         elements.append(Paragraph(f"<b>Test ID:</b> {test_id}", normal_style))
-        elements.append(Paragraph(f"<b>Target Vendor:</b> {test.target_vendor}", normal_style))
-        elements.append(Paragraph(f"<b>Target Model:</b> {test.target_model}", normal_style))
+        # SecurityTest stores target_models as a JSON list of {vendor, model} dicts;
+        # there are no scalar target_vendor/target_model columns. Derive readable text.
+        target_models_list = test.target_models if isinstance(test.target_models, list) else []
+        target_models_text = ", ".join(
+            str(m.get("model")) for m in target_models_list
+            if isinstance(m, dict) and m.get("model")
+        ) or "N/A"
+        target_vendors_text = ", ".join(sorted({
+            str(m.get("vendor")) for m in target_models_list
+            if isinstance(m, dict) and m.get("vendor")
+        })) or "N/A"
+        elements.append(Paragraph(f"<b>Target Vendor(s):</b> {target_vendors_text}", normal_style))
+        elements.append(Paragraph(f"<b>Target Model(s):</b> {target_models_text}", normal_style))
         if test.created_at:
             elements.append(Paragraph(f"<b>Created:</b> {test.created_at.strftime('%Y-%m-%d %H:%M')}", normal_style))
         elements.append(Paragraph(f"<b>Export Date:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", normal_style))
