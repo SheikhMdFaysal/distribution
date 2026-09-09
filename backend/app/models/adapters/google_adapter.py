@@ -29,7 +29,8 @@ class GoogleAdapter(ModelAdapter):
         self.model_type = "enterprise"
         self.client = None
         
-        print(f"\n=== [GOOGLE ADAPTER] API Key: {api_key[:20]}... ===" if api_key else "\n=== [GOOGLE ADAPTER] No API key ===")
+        # Never log key material (even a prefix). Only log whether a key is present.
+        print("\n=== [GOOGLE ADAPTER] API key configured ===" if api_key else "\n=== [GOOGLE ADAPTER] No API key ===")
         
         if api_key and api_key != "your-google-api-key-here":
             try:

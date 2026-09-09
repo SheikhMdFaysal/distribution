@@ -15,9 +15,12 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import os
 
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.models.database import init_db, get_session_local
 from app.api.routes import security_tests, variants, analytics, health
 
@@ -97,10 +100,17 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Enterprise AI Security Red Teaming Platform API",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    # Only expose the interactive API explorer in development. In production the
+    # full unauthenticated schema should not be browsable by anyone with the URL.
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
+    openapi_url="/api/openapi.json" if settings.DEBUG else None,
     lifespan=lifespan,
 )
+
+# Rate limiting (slowapi): attach the shared limiter and its 429 handler.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
 app.add_middleware(
