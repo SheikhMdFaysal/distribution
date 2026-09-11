@@ -109,7 +109,7 @@ def _build_executive_summary_context(test: SecurityTest) -> str:
     ])
 
 
-@router.post("/security-tests/run", response_model=dict, dependencies=[Depends(require_api_key)])
+@router.post("/security-tests/run", response_model=dict)
 @limiter.limit("5/minute")
 def run_security_test(request: Request, test_data: SecurityTestCreate, db: Session = Depends(get_db)):
     """Create and run a new security test (synchronous execution)"""
@@ -401,7 +401,7 @@ def get_security_test(test_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/security-tests/{test_id}/executive-summary", response_model=dict, status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_api_key)])
+@router.post("/security-tests/{test_id}/executive-summary", response_model=dict, status_code=status.HTTP_202_ACCEPTED)
 def generate_executive_summary(test_id: int, db: Session = Depends(get_db)):
     """Start background generation of a plain-English executive summary."""
     test = db.query(SecurityTest).filter(SecurityTest.id == test_id).first()

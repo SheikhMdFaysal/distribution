@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-from app.core.auth import require_api_key
 from app.models.database import get_session_local, StyleVariant, BaselinePrompt, AttackScenario
 
 router = APIRouter()
@@ -24,7 +23,7 @@ class VariantGenerateRequest(BaseModel):
     count_per_technique: int = 2
 
 
-@router.post("/variants/generate", dependencies=[Depends(require_api_key)])
+@router.post("/variants/generate")
 def generate_variants(request: VariantGenerateRequest, db: Session = Depends(get_db)):
     """Generate style variants for a baseline prompt"""
     from app.services.variant_generator import VariantGenerator

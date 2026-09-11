@@ -6,7 +6,7 @@ import os
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Enterprise AI Security Red Teaming Platform"
-    APP_VERSION: str = "1.4.2"
+    APP_VERSION: str = "1.4.3"
     DEBUG: bool = False
     
     # Database
@@ -54,7 +54,12 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Rate Limiting
-    RATE_LIMIT_REQUESTS: int = 100
+    # This is the GLOBAL default applied to every route, including cheap reads.
+    # The dashboard polls health every 45s (80/hour on an idle open tab) and
+    # polls the executive-summary job every 1.5s, so a 100/hour cap locks out
+    # ordinary visitors with 429s. Cost abuse is bounded by the per-route limit
+    # on /security-tests/run instead, which is what actually spends money.
+    RATE_LIMIT_REQUESTS: int = 1000
     RATE_LIMIT_WINDOW: int = 3600  # 1 hour
     
     # Model API Timeouts

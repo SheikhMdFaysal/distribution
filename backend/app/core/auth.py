@@ -1,9 +1,14 @@
-"""API-key authentication for state-changing / expensive endpoints.
+"""API-key authentication for destructive endpoints.
 
-The public static demo frontend issues read-only calls with no credentials, so
-GET routes stay open. Write and cost-incurring routes (running tests, deleting,
-cancelling, generating variants, executive summaries) require a valid API key
-supplied via the `X-API-Key` header (or `Authorization: Bearer <key>`).
+This platform is a public demo with no login, so the routes a visitor needs
+(running a test, generating variants, generating an executive summary) cannot
+require a credential: the only place to put one would be the browser bundle,
+where anyone can read it. Cost abuse on those routes is bounded by the rate
+limit in app/core/rate_limit.py instead.
+
+Destructive routes that the dashboard never calls (deleting and cancelling
+tests) do require a valid API key via the `X-API-Key` header (or
+`Authorization: Bearer <key>`).
 
 Valid keys come from the `API_KEYS` setting (comma-separated). In production the
 default placeholder key is rejected so the app fails loudly instead of shipping
