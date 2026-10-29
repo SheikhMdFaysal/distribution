@@ -153,6 +153,13 @@ export interface DashboardAnalytics {
   risk_distribution: Array<{ level: string; count: number }>;
 }
 
+// The backend stores UTC in timezone-naive columns, so its ISO strings carry no
+// offset and browsers would otherwise read them as local time.
+export function parseServerDate(iso: string): Date {
+  const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(iso);
+  return new Date(hasZone ? iso : `${iso}Z`);
+}
+
 // ---------- Fetch helper ----------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

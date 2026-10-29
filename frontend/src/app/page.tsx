@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   api,
+  parseServerDate,
   type AttackScenario,
   type HealthResponse,
   type TestRunDetails,
@@ -16,18 +17,14 @@ import { ScenarioFormSkeleton } from "@/components/Skeleton";
 import { ToastProvider, useToast } from "@/components/Toast";
 import { ActivityTicker } from "@/components/ActivityTicker";
 
-// All free-tier models supported by the backend.
-// (Backend's adapter factory routes "google", "groq", "openrouter", "huggingface".)
+// Preset models, each verified live on 2026-10-29. Free-tier catalogs change
+// often; re-verify before adding entries (OpenRouter, Hugging Face and NVIDIA
+// presets were removed after their models were retired or credits ran out).
 const FREE_MODELS = [
   { adapter: "google", model: "gemini-2.5-flash", vendor: "Google", label: "Gemini 2.5 Flash (Google)" },
-  { adapter: "google", model: "gemini-2.0-flash", vendor: "Google", label: "Gemini 2.0 Flash (Google)" },
+  { adapter: "google", model: "gemini-3.5-flash-lite", vendor: "Google", label: "Gemini 3.5 Flash Lite (Google)" },
   { adapter: "groq", model: "openai/gpt-oss-20b", vendor: "Groq", label: "GPT-OSS 20B (Groq)" },
   { adapter: "groq", model: "openai/gpt-oss-120b", vendor: "Groq", label: "GPT-OSS 120B (Groq)" },
-  { adapter: "openrouter", model: "meta-llama/llama-3.2-3b-instruct:free", vendor: "OpenRouter", label: "Llama 3.2 3B Instruct free (OpenRouter — may rate-limit)" },
-  { adapter: "huggingface", model: "meta-llama/Llama-3.1-8B-Instruct", vendor: "HuggingFace", label: "Llama 3.1 8B Instruct (HuggingFace)" },
-  { adapter: "huggingface", model: "Qwen/Qwen2.5-7B-Instruct", vendor: "HuggingFace", label: "Qwen 2.5 7B Instruct (HuggingFace)" },
-  { adapter: "nvidia", model: "meta/llama-3.1-8b-instruct", vendor: "NVIDIA", label: "Llama 3.1 8B Instruct (NVIDIA NIM)" },
-  { adapter: "nvidia", model: "meta/llama-3.3-70b-instruct", vendor: "NVIDIA", label: "Llama 3.3 70B Instruct (NVIDIA NIM)" },
 ];
 
 const TECHNIQUES = [
@@ -220,9 +217,9 @@ function DashboardInner() {
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6 flex items-start justify-between gap-4">
+        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -231,7 +228,7 @@ function DashboardInner() {
               className="h-14 w-14 rounded-2xl shrink-0"
             />
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
                 Enterprise AI Security Red Teaming Platform
               </h1>
               <p className="mt-2 text-slate-400">
@@ -239,7 +236,7 @@ function DashboardInner() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             <StatusDot health={health} error={error} />
             <ThemeToggle />
             <button
@@ -268,7 +265,7 @@ function DashboardInner() {
               </li>
               <li>
                 <strong>Pick a target AI model.</strong> Choose from preset free-tier
-                models (Gemini, Groq Llama, OpenRouter) or enable{" "}
+                models (Google Gemini, and OpenAI GPT-OSS hosted on Groq) or enable{" "}
                 <em className="text-cyan-300">Bring Your Own Model</em> to test your
                 organization&apos;s own AI deployment via its OpenAI-compatible endpoint.
               </li>
@@ -634,14 +631,54 @@ function HighlightedResponse({
   );
 }
 
-function isQuotaError(text: string) {
-  if (!text) return false;
-  const t = text.toLowerCase();
+// Translate raw provider errors into something a visitor can act on.
+function describeModelError(raw: string): { title: string; hint: string } {
+  const t = raw.toLowerCase();
+  const has = (...keys: string[]) => keys.some((k) => t.includes(k));
+  if (has("timed out", "did not respond within", "timeout"))
+    return {
+      title: "The model took too long to answer.",
+      hint: "The provider may be overloaded. Try again, or pick another model.",
+    };
+  if (has("402", "credits", "billing", "payment"))
+    return {
+      title: "This provider's free credits are used up.",
+      hint: "Pick another model from the dropdown.",
+    };
+  if (has("429", "quota", "rate limit", "rate-limit", "resource_exhausted", "exceeded"))
+    return {
+      title: "This model is busy or its free quota is used up.",
+      hint: "Wait a minute and try again, or pick another model. Google and Groq have separate quotas.",
+    };
+  if (has("401", "403", "api key", "api_key", "unauthorized", "forbidden", "permission"))
+    return {
+      title: "The platform could not sign in to this provider.",
+      hint: "Pick another model. If you are using your own model, check its API key.",
+    };
+  if (has("404", "410", "gone", "end of life", "no longer available", "does not exist", "not found", "not supported", "decommissioned", "deprecated"))
+    return {
+      title: "This model has been retired by its provider.",
+      hint: "Pick another model from the dropdown.",
+    };
+  return {
+    title: "The AI provider could not process this request.",
+    hint: "Try again, or pick another model.",
+  };
+}
+
+function ModelErrorNotice({ raw }: { raw: string }) {
+  const { title, hint } = describeModelError(raw);
   return (
-    t.includes("quota") ||
-    t.includes("rate limit") ||
-    t.includes("429") ||
-    t.includes("exceeded")
+    <div className="rounded bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
+      <strong>{title}</strong>
+      <span className="text-xs text-amber-300/80 mt-1 block">
+        {hint} This is a provider issue, not a security finding, so this run was not scored.
+      </span>
+      <details className="mt-2 text-xs text-slate-400">
+        <summary className="cursor-pointer select-none">Technical details</summary>
+        <code className="mt-1 block whitespace-pre-wrap break-all">{raw}</code>
+      </details>
+    </div>
   );
 }
 
@@ -816,29 +853,10 @@ function ResultPanel({
                   {(() => {
                     const text = (mr.response_text || "").trim();
                     if (mr.error_message) {
-                      return (
-                        <div className="rounded bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-200">
-                          ⛔ <strong>Model error:</strong> {mr.error_message}
-                        </div>
-                      );
+                      return <ModelErrorNotice raw={mr.error_message} />;
                     }
-                    if (isQuotaError(text)) {
-                      return (
-                        <div className="rounded bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
-                          ⚠ <strong>Free-tier quota exhausted</strong> for{" "}
-                          <code className="bg-amber-900/40 px-1.5 py-0.5 rounded">
-                            {mr.model_name}
-                          </code>
-                          .
-                          <br />
-                          <span className="text-xs text-amber-300/80 mt-1 block">
-                            Pick a different model from the dropdown above (Groq and
-                            OpenRouter have separate quotas) or wait until tomorrow when
-                            Gemini resets. This is not a platform error — the AI provider
-                            rejected the request.
-                          </span>
-                        </div>
-                      );
+                    if (mr.status === "failed" || text.startsWith("[Error:")) {
+                      return <ModelErrorNotice raw={text || "No details returned."} />;
                     }
                     if (!text) {
                       return (
@@ -872,7 +890,6 @@ function ResultPanel({
                       mr.status === "failed" ||
                       !!mr.error_message ||
                       !respText ||
-                      isQuotaError(respText) ||
                       respText.startsWith("[Error:") ||
                       respText.startsWith("[Simulated");
                     if (isFailedRun) {
@@ -914,7 +931,7 @@ function ResultPanel({
 
       <p className="mt-4 text-xs text-slate-600">
         Report ID: {result.id} · Generated{" "}
-        {result.completed_at ? new Date(result.completed_at).toLocaleString() : "—"}
+        {result.completed_at ? parseServerDate(result.completed_at).toLocaleString() : "—"}
       </p>
     </section>
   );

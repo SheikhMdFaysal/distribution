@@ -62,7 +62,7 @@ export function StatsWidget({ refreshKey = 0 }: StatsWidgetProps) {
   const stats: StatsItem[] = [
     {
       label: "Security tests run",
-      value: data?.summary.total_tests ?? 0,
+      value: data?.summary.completed_tests ?? 0,
       color: "text-cyan-300",
       iconColor: "bg-cyan-500/10 text-cyan-300",
       Icon: ShieldIcon,

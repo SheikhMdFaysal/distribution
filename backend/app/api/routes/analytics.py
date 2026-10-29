@@ -10,6 +10,10 @@ from app.models.database import (
 
 router = APIRouter()
 
+# Failed runs (provider errors, retired models) carry a placeholder "safe" score.
+# Counting them would make a broken model look perfectly secure.
+_ANSWERED = ModelRun.status == "completed"
+
 def get_db():
     SessionLocal = get_session_local()
     db = SessionLocal()
@@ -41,8 +45,8 @@ def get_dashboard_analytics(db: Session = Depends(get_db)):
         func.sum(EvaluationScore.leakage_detected.cast(Integer)).label("leakage_count")
     ).join(
         EvaluationScore, ModelRun.id == EvaluationScore.model_run_id
-    ).group_by(ModelRun.model_vendor).all()
-    
+    ).filter(_ANSWERED).group_by(ModelRun.model_vendor).all()
+
     vendor_comparison = []
     for vendor, total, leakage in vendor_stats:
         leakage_rate = (leakage / total * 100) if total > 0 else 0
@@ -57,7 +61,9 @@ def get_dashboard_analytics(db: Session = Depends(get_db)):
     risk_distribution = db.query(
         EvaluationScore.risk_level,
         func.count(EvaluationScore.id).label("count")
-    ).group_by(EvaluationScore.risk_level).all()
+    ).join(
+        ModelRun, ModelRun.id == EvaluationScore.model_run_id
+    ).filter(_ANSWERED).group_by(EvaluationScore.risk_level).all()
     
     return {
         "summary": {
@@ -89,7 +95,7 @@ def get_test_analytics(test_id: int, db: Session = Depends(get_db)):
     ).join(
         BaselinePrompt, StyleVariant.baseline_prompt_id == BaselinePrompt.id
     ).filter(
-        BaselinePrompt.security_test_id == test_id
+        BaselinePrompt.security_test_id == test_id, _ANSWERED
     ).all()
     
     # Attack success rate by technique
@@ -124,7 +130,7 @@ def get_test_analytics(test_id: int, db: Session = Depends(get_db)):
     ).join(
         BaselinePrompt, StyleVariant.baseline_prompt_id == BaselinePrompt.id
     ).filter(
-        BaselinePrompt.security_test_id == test_id
+        BaselinePrompt.security_test_id == test_id, _ANSWERED
     ).group_by(ModelRun.model_vendor).all()
     
     vendor_comparison = [
@@ -172,6 +178,7 @@ def get_recent_activity(limit: int = 15, db: Session = Depends(get_db)):
         .join(StyleVariant, ModelRun.style_variant_id == StyleVariant.id)
         .join(BaselinePrompt, StyleVariant.baseline_prompt_id == BaselinePrompt.id)
         .join(SecurityTest, BaselinePrompt.security_test_id == SecurityTest.id)
+        .filter(_ANSWERED)
         .order_by(ModelRun.created_at.desc())
         .limit(min(limit, 50))
         .all()
@@ -206,7 +213,7 @@ def get_vendor_comparison(db: Session = Depends(get_db)):
         func.max(EvaluationScore.risk_score).label("max_risk")
     ).join(
         EvaluationScore, ModelRun.id == EvaluationScore.model_run_id
-    ).group_by(ModelRun.model_vendor, ModelRun.model_name).all()
+    ).filter(_ANSWERED).group_by(ModelRun.model_vendor, ModelRun.model_name).all()
     
     return {
         "vendors": [

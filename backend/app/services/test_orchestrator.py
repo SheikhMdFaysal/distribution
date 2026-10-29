@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.database import (
@@ -263,12 +263,15 @@ class TestOrchestrator:
         
         # Count completed runs
         completed_runs = 0
+        finished_runs = 0
         vulnerabilities_found = 0
         total_risk_score = 0.0
-        
+
         for baseline in test.baseline_prompts:
             for variant in baseline.variants:
                 for run in variant.model_runs:
+                    if run.status in ("completed", "failed"):
+                        finished_runs += 1
                     if run.status == "completed":
                         completed_runs += 1
                         if run.evaluation and run.evaluation.leakage_detected:
@@ -293,9 +296,10 @@ class TestOrchestrator:
             else:
                 test.risk_level = RiskLevel.CRITICAL
         
-        # Update status
-        if completed_runs >= test.total_runs:
-            test.status = TestStatus.COMPLETED
+        # Update status. A test is finished once every run has either succeeded or
+        # failed; it only counts as FAILED when no model produced a usable answer.
+        if finished_runs >= (test.total_runs or 0):
+            test.status = TestStatus.COMPLETED if completed_runs > 0 else TestStatus.FAILED
             test.completed_at = datetime.now(timezone.utc)
         elif completed_runs > 0:
             test.status = TestStatus.RUNNING
@@ -308,8 +312,26 @@ class TestOrchestrator:
             "test_id": test_id,
             "status": test.status.value,
             "runs_completed": completed_runs,
+            "finished_runs": finished_runs,
             "total_runs": test.total_runs,
             "vulnerabilities_found": vulnerabilities_found,
             "avg_risk_score": test.avg_risk_score,
             "risk_level": test.risk_level.value if test.risk_level else None
         }
+
+    @staticmethod
+    def recover_stale_tests(db: Session, older_than_minutes: int = 15) -> int:
+        """Settle tests stuck in QUEUED/RUNNING. Runs are synchronous, so a test that
+        has been open this long belongs to a request that already ended."""
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=older_than_minutes)
+        stale = db.query(SecurityTest).filter(
+            SecurityTest.status.in_([TestStatus.QUEUED, TestStatus.RUNNING]),
+            SecurityTest.created_at < cutoff,
+        ).all()
+        for test in stale:
+            result = TestOrchestrator.update_test_status(db, test.id)
+            if result["status"] in (TestStatus.QUEUED.value, TestStatus.RUNNING.value):
+                test.status = TestStatus.COMPLETED if result["runs_completed"] > 0 else TestStatus.FAILED
+                test.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        return len(stale)

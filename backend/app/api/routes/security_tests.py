@@ -186,7 +186,11 @@ def run_security_test(request: Request, test_data: SecurityTestCreate, db: Sessi
         return {
             "test_id": test.id,
             "status": test.status.value if test.status else "completed",
-            "message": "Test completed successfully",
+            "message": (
+                "No model returned a usable response"
+                if test.status == TestStatus.FAILED
+                else "Test completed successfully"
+            ),
             "runs_completed": test.runs_completed or total_completed,
             "vulnerabilities_found": test.vulnerabilities_found or vulnerabilities_found,
             "errors": run_errors if run_errors else None,

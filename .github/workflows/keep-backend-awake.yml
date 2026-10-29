@@ -1,0 +1,17 @@
+# Render's free tier sleeps the backend after 15 idle minutes, which makes the
+# first visitor wait ~20-60 seconds. Ping the health endpoint to keep it warm.
+# One always-on free service uses ~744 of Render's 750 monthly free hours.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping health endpoint
+        run: curl --silent --show-error --fail --max-time 120 --retry 2 https://ai-security-backend-p4p6.onrender.com/api/v1/health

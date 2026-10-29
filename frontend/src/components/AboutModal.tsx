@@ -7,7 +7,7 @@ interface AboutModalProps {
   onClose: () => void;
 }
 
-const APP_VERSION = "1.4.3";
+const APP_VERSION = "1.4.4";
 
 /**
  * Modal showing platform credits, sponsor info, and origin.

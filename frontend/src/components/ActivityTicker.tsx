@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type ActivityEntry } from "@/lib/api";
+import { api, parseServerDate, type ActivityEntry } from "@/lib/api";
 
 /**
  * Scrolling ticker of recent anonymized test activity.
@@ -87,8 +87,9 @@ function ActivityPill({ item }: { item: ActivityEntry }) {
 }
 
 function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const seconds = Math.floor(diff / 1000);
+  const diff = Date.now() - parseServerDate(iso).getTime();
+  const seconds = Math.max(0, Math.floor(diff / 1000));
+  if (seconds < 10) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;

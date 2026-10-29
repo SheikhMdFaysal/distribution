@@ -1,6 +1,11 @@
 from typing import Dict, Any, Optional
 import builtins as _builtins
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
 from .base import ModelAdapter
+
+# The Gemini SDK call has no reliable timeout of its own; a retired or overloaded
+# model can hang for minutes. Run it on a worker so we can enforce a deadline.
+_gemini_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="gemini")
 
 
 def _safe_print(*args, **kwargs):
@@ -67,34 +72,42 @@ class GoogleAdapter(ModelAdapter):
         try:
             if self.client:
                 print("[GOOGLE ADAPTER] -> Calling REAL Google Gemini API...")
-                
-                # Try new API first
+
+                def _call() -> str:
+                    # Try new API first
+                    try:
+                        response = self.client.models.generate_content(
+                            model=self.model,
+                            contents=prompt,
+                            config={
+                                "temperature": default_params["temperature"],
+                                "max_output_tokens": default_params["max_tokens"],
+                            }
+                        )
+                        return response.text if hasattr(response, 'text') else str(response)
+                    except AttributeError:
+                        # Fall back to old API
+                        model = self.client.GenerativeModel(self.model)
+                        response = model.generate_content(
+                            prompt,
+                            generation_config={
+                                "temperature": default_params["temperature"],
+                                "max_output_tokens": default_params["max_tokens"],
+                            }
+                        )
+                        if hasattr(response, 'text'):
+                            return response.text
+                        if hasattr(response, 'parts'):
+                            return "".join([part.text for part in response.parts if hasattr(part, 'text')])
+                        return ""
+
                 try:
-                    response = self.client.models.generate_content(
-                        model=self.model,
-                        contents=prompt,
-                        config={
-                            "temperature": default_params["temperature"],
-                            "max_output_tokens": default_params["max_tokens"],
-                        }
+                    response_text = _gemini_pool.submit(_call).result(timeout=self.timeout)
+                except _FutureTimeout:
+                    raise TimeoutError(
+                        f"Gemini model {self.model} did not respond within {self.timeout} seconds."
                     )
-                    response_text = response.text if hasattr(response, 'text') else str(response)
-                except AttributeError:
-                    # Fall back to old API
-                    model = self.client.GenerativeModel(self.model)
-                    response = model.generate_content(
-                        prompt,
-                        generation_config={
-                            "temperature": default_params["temperature"],
-                            "max_output_tokens": default_params["max_tokens"],
-                        }
-                    )
-                    response_text = ""
-                    if hasattr(response, 'text'):
-                        response_text = response.text
-                    elif hasattr(response, 'parts'):
-                        response_text = "".join([part.text for part in response.parts if hasattr(part, 'text')])
-                
+
                 # ASCII-safe print: Gemini responses can contain Unicode that breaks Windows cp1252 console
                 _safe = response_text[:100].encode("ascii", errors="replace").decode("ascii")
                 print(f"[GOOGLE ADAPTER] [OK] Got response: {_safe}...")

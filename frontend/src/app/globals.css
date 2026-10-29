@@ -130,6 +130,28 @@ html:not(.dark) .text-rose-300 { color: #e11d48 !important; }
 html:not(.dark) .text-rose-400 { color: #f43f5e !important; }
 html:not(.dark) .text-red-400 { color: #dc2626 !important; }
 
+/* Result cards and panels */
+html:not(.dark) .bg-slate-700 { background-color: #e2e8f0 !important; }
+html:not(.dark) .bg-slate-800\/50 { background-color: #f1f5f9 !important; }
+html:not(.dark) .bg-slate-800\/30 { background-color: #f8fafc !important; }
+html:not(.dark) .border-slate-500 { border-color: #94a3b8 !important; }
+html:not(.dark) .border-slate-600 { border-color: #cbd5e1 !important; }
+html:not(.dark) .border-slate-800\/50 { border-color: #e2e8f0 !important; }
+
+html:not(.dark) .text-amber-200 { color: #92400e !important; }
+html:not(.dark) .text-amber-300 { color: #b45309 !important; }
+html:not(.dark) .text-amber-300\/80 { color: #b45309 !important; }
+html:not(.dark) .text-amber-400 { color: #d97706 !important; }
+html:not(.dark) .text-green-300 { color: #15803d !important; }
+html:not(.dark) .text-green-400 { color: #16a34a !important; }
+html:not(.dark) .text-purple-200 { color: #6b21a8 !important; }
+html:not(.dark) .text-purple-400 { color: #9333ea !important; }
+html:not(.dark) .text-cyan-200 { color: #155e75 !important; }
+html:not(.dark) .text-cyan-300\/80,
+html:not(.dark) .text-cyan-300\/70 { color: #0e7490 !important; }
+html:not(.dark) .text-red-100 { color: #7f1d1d !important; }
+html:not(.dark) .text-red-300 { color: #b91c1c !important; }
+
 /* Toast backgrounds (xxx-950/80) become white in our scheme; restore them */
 html:not(.dark) .bg-emerald-950\/80 { background-color: #ecfdf5 !important; }
 html:not(.dark) .bg-rose-950\/80 { background-color: #fff1f2 !important; }

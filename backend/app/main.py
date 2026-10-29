@@ -88,6 +88,18 @@ def _background_db_bootstrap():
     except Exception as e:
         print(f"[STARTUP] Seed step failed (non-fatal): {e}")
 
+    try:
+        from app.services.test_orchestrator import TestOrchestrator
+        SessionLocal = get_session_local()
+        db = SessionLocal()
+        try:
+            n = TestOrchestrator.recover_stale_tests(db)
+            print(f"[STARTUP] Settled {n} stale test(s)")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[STARTUP] Stale test recovery failed (non-fatal): {e}")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):

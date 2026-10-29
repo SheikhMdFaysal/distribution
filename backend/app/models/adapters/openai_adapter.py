@@ -95,7 +95,7 @@ class OpenAIAdapter(ModelAdapter):
                 "response_text": f"[Error: {str(e)}]",
                 "model_name": self.model,
                 "model_type": self.model_type,
-                "vendor": "openai",
+                "vendor": self.vendor,
                 "metadata": {
                     "error": str(e),
                     "response_time_ms": 0,
@@ -131,5 +131,5 @@ class OpenAIAdapter(ModelAdapter):
         return {
             "model_name": self.model,
             "model_type": self.model_type,
-            "vendor": "openai"
+            "vendor": self.vendor
         }
